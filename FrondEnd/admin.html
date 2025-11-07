@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Level VR Club — Нові бронювання</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      background: #0d1117;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      color: #00cfff;
+      margin-bottom: 15px;
+    }
+    .booking {
+      background: #161b22;
+      border: 1px solid #30363d;
+      padding: 10px 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      animation: fadein 0.2s;
+    }
+    .time {
+      font-weight: bold;
+      color: #00cfff;
+    }
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <h1>🔔 Нові бронювання (онлайн)</h1>
+  <div id="bookings"></div>
+
+  <script>
+    const socket = io();
+    const list = document.getElementById('bookings');
+
+    socket.on('connect', () => {
+      console.log('📡 Connected to server for live bookings');
+    });
+
+    socket.on('newBooking', data => {
+      const el = document.createElement('div');
+      el.className = 'booking';
+
+      el.innerHTML = `
+        <div class="time">${data.date} — ${data.time}</div>
+        ${data.cart.map(c =>
+          `${c.device} — ${c.duration} год — ${c.persons} ос. — ${c.price} грн`
+        ).join('<br>')}
+        <br><b>Разом: ${data.totalPrice} грн</b><br>
+        👤 ${data.name || '—'} | 📞 ${data.phone || '—'}
+        ${data.comment ? `<br>💬 ${data.comment}` : ''}
+      `;
+
+      list.prepend(el);
+
+      // Звук
+      try {
+        const audio = new Audio('https://assets.mixkit.co/sfx/download/mixkit-correct-answer-tone-2870.wav');
+        audio.play();
+      } catch (e) {
+        console.log('Audio play blocked by browser');
+      }
+    });
+  </script>
+</body>
+</html>
