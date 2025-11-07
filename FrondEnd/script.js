@@ -171,3 +171,23 @@ window.addEventListener('click', (e) => {
     closeModal();
   }
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const toggle = document.querySelector(".menu-toggle");
+  const menu = document.getElementById("menu");
+
+  if (!toggle || !menu) return; // Захист від зависання
+
+  toggle.addEventListener("click", () => {
+    toggle.classList.toggle("active");
+    menu.classList.toggle("open");
+  });
+
+  // Закривати меню при кліку на посилання
+  document.querySelectorAll(".menu a").forEach(link => {
+    link.addEventListener("click", () => {
+      toggle.classList.remove("active");
+      menu.classList.remove("open");
+    });
+  });
+});
