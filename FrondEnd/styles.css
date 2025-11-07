@@ -686,18 +686,19 @@ footer p {
     font-size: 2rem; /* Розмір шрифту, якщо потрібно змінити */
 }
 
-/* === Навігація === */
+/* ======== NAVBAR ======== */
 .navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: rgba(0, 0, 0, 0.8);
-  padding: 10px 20px;
+  padding: 10px 25px;
   position: fixed;
   width: 100%;
   top: 0;
   left: 0;
   z-index: 1000;
+  backdrop-filter: blur(6px);
 }
 
 .logo {
@@ -707,38 +708,27 @@ footer p {
 }
 
 .logo img {
-  height: 35px;
+  height: 40px;
 }
 
 .logo-text {
-  font-weight: 600;
-  color: #fff;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: bold;
 }
 
+/* Меню */
 .menu {
-  position: fixed;
-  top: 0;
-  right: -100%;
-  height: 100%;
-  width: 70%;
-  background: rgba(0, 0, 0, 0.95);
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition: right 0.4s ease;
   display: flex;
-  gap: 20px;
-}
-
-.menu.open {
-  right: 0;
+  align-items: center;
+  gap: 25px;
 }
 
 .menu a {
   color: white;
   text-decoration: none;
   font-weight: 500;
-  font-size: 1.2rem;
+  font-size: 1rem;
   transition: color 0.3s ease;
 }
 
@@ -746,17 +736,18 @@ footer p {
   color: #00ff88;
 }
 
-/* ======== Кнопка "Забронювати" в меню ======== */
-.menu .book-btn {
+/* Кнопка Забронювати */
+.menu-book-btn {
   background: #00a63c;
   color: white;
-  padding: 12px 25px;
-  border-radius: 10px;
+  padding: 8px 15px;
+  border-radius: 8px;
   font-weight: 600;
+  text-decoration: none;
   transition: background 0.3s ease;
 }
 
-.menu .book-btn:hover {
+.menu-book-btn:hover {
   background: #009030;
 }
 
@@ -766,6 +757,7 @@ footer p {
   flex-direction: column;
   gap: 5px;
   cursor: pointer;
+  z-index: 1100;
 }
 
 .menu-toggle div {
@@ -776,7 +768,7 @@ footer p {
   transition: all 0.4s ease;
 }
 
-/* Анімація бургеру */
+/* Активний бургер */
 .menu-toggle.active div:nth-child(1) {
   transform: rotate(45deg) translate(5px, 5px);
 }
@@ -789,54 +781,44 @@ footer p {
 
 /* ======== Mobile ======== */
 @media (max-width: 768px) {
-  .menu-toggle {
-    display: flex;
-  }
   .menu {
-    display: flex;
+    position: absolute;
+    top: 60px;
+    left: 0;
+    width: 100%;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.95);
+    display: none;
+    animation: slideDown 0.3s ease forwards;
   }
-}
 
-/* ======== Desktop ======== */
-@media (min-width: 769px) {
-  .menu {
-    position: static;
-    background: transparent;
-    flex-direction: row;
-    height: auto;
-    width: auto;
-    right: 0;
-    gap: 30px;
-    transform: none !important;
+  .menu.active {
+    display: flex;
   }
 
   .menu a {
-    font-size: 1rem;
+    padding: 12px;
+    text-align: center;
+    width: 100%;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .menu-book-btn {
+    width: 80%;
+    text-align: center;
+    margin: 10px auto 20px auto;
   }
 
   .menu-toggle {
-    display: none;
+    display: flex;
   }
 }
 
-/* ======== Overlay для мобільного меню ======== */
-.menu-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.6);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease;
-  z-index: 999;
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.menu-overlay.active {
-  opacity: 1;
-  visibility: visible;
-}
 
 
 .vrgame {
@@ -915,12 +897,4 @@ footer p {
   to { opacity: 1; }
 }
 
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(6px);
-}
+
