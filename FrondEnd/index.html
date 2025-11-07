@@ -17,17 +17,21 @@
         <nav class="navbar">
             <div class="logo">
                 <img src="images/favicon.svg" alt="Логотип">
+                <span class="logo-text">Level VR</span>
             </div>
-            <div class="menu-toggle" onclick="toggleMenu()">
+
+            <div class="menu-toggle" id="menuToggle">
                 <div></div>
                 <div></div>
                 <div></div>
             </div>
+
             <div class="menu" id="menu">
                 <a href="#">Головна</a>
-                <a href="#vrgame"> VR Ігри</a>
-                <a href="#psgames"> PlayStation 5</a>
-                <a href="#contact"> Контакти</a>
+                <a href="#vrgame">VR Ігри</a>
+                <a href="#psgames">PlayStation 5</a>
+                <a href="#contact">Контакти</a>
+                <a href="#pricing" class="menu-book-btn">Забронювати</a>
             </div>
         </nav>
         
@@ -204,15 +208,20 @@
                     </div>
                     <!-- Кнопка для відкриття модального вікна -->
                     <button class="centered-btn" onclick="openModal()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                            <path fill-rule="evenodd" d="M8.5 3a1 1 0 01.894.553L11 7h4.5a1 1 0 110 2H11l-1.606 3.447a1 1 0 01-.788.553L7 13V6.5a1 1 0 112 0V12l.354-.177L8.5 3z" clip-rule="evenodd"/>
-                        </svg> Забронювати 
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Забронювати</span>
                     </button>
-                    <button class="centered-btn" onclick="clearCart()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                            <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6z" clip-rule="evenodd"/>
-                        </svg> Очистити кошик
+
+                    <!-- Кнопка "Очистити кошик" -->
+                    <button class="centered-btn clear-btn" onclick="clearCart()">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M6 7h12M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Очистити кошик</span>
                     </button>
+
                     
                 </div>
                 <h2>Тарифи</h2>

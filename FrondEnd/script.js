@@ -132,3 +132,44 @@ function scrollRight() {
 // === Автоповернення на верх ===
 window.scrollTo(0, 0);
 window.history.replaceState(null, null, " ");
+
+const menuToggle = document.getElementById('menuToggle');
+const menu = document.getElementById('menu');
+
+menuToggle.addEventListener('click', () => {
+  menu.classList.toggle('active');
+  menuToggle.classList.toggle('active');
+});
+
+// закриття при кліку на пункт
+document.querySelectorAll('#menu a').forEach(link => {
+  link.addEventListener('click', () => {
+    menu.classList.remove('active');
+    menuToggle.classList.remove('active');
+  });
+});
+// отримуємо елементи
+const modal = document.getElementById('dateTimeModal');
+const closeBtn = document.querySelector('.close-btn');
+
+// функція відкриття
+function openModal() {
+  modal.style.display = 'block';
+  document.body.style.overflow = 'hidden'; // щоб сторінка не скролилась під час модалки
+}
+
+// функція закриття
+function closeModal() {
+  modal.style.display = 'none';
+  document.body.style.overflow = ''; // повертаємо скрол
+}
+
+// закриття при кліку на "X"
+closeBtn.addEventListener('click', closeModal);
+
+// закриття при кліку поза модалкою
+window.addEventListener('click', (e) => {
+  if (e.target === modal) {
+    closeModal();
+  }
+});
