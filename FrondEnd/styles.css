@@ -2073,3 +2073,56 @@ html, body {
         color: #555;
     }
 }
+
+/* =============================================
+   🖥️ ФІКС ДЛЯ ПК (ПОВЕРТАЄМО СІТКУ)
+   Вставте це в самий низ файлу
+   ============================================= */
+
+@media (min-width: 1024px) {
+    
+    /* 1. Повертаємо сітку для контейнера */
+    .vr-swiper-container .swiper-wrapper,
+    .ps-swiper-container .swiper-wrapper,
+    .my-swiper-container .swiper-wrapper {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important; /* 4 колонки */
+        gap: 30px !important;
+        transform: none !important; /* Вимикаємо прокрутку слайдера */
+        width: 100% !important;
+    }
+
+    /* 2. Слайд має займати лише свою клітинку */
+    .swiper-slide {
+        width: auto !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    /* 3. Фіксимо розмір карток (щоб не були гігантськими) */
+    .final-card, .vr-card, .ps-card {
+        width: 100% !important; /* Розтягується тільки в межах своєї колонки */
+        max-width: none !important;
+        height: auto !important;
+        aspect-ratio: 2/3; /* Пропорція як у постерів */
+        margin: 0 !important;
+        transform: none !important; /* Прибираємо зсуви */
+    }
+
+    /* 4. Фіксимо картинку всередині */
+    .final-card img, .vr-card img, .ps-card img {
+        height: 80% !important; /* Картинка займає 80% висоти */
+    }
+    
+    .final-card h3, .vr-card h3, .ps-card h3 {
+        height: 20% !important; /* Текст займає 20% */
+        font-size: 1rem !important;
+    }
+
+    /* 5. Ховаємо стрілки і крапки на ПК */
+    .swiper-button-next, .swiper-button-prev, .swiper-pagination,
+    .vr-next, .vr-prev, .vr-pagination,
+    .ps-next, .ps-prev, .ps-pagination {
+        display: none !important;
+    }
+}

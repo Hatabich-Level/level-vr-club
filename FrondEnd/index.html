@@ -534,9 +534,11 @@
                 loop: true,           // Зациклення
                 
                 // Автопрокрутка (5 секунд)
+                // !!! НАЛАШТУВАННЯ АВТОПРОКРУТКИ !!!
                 autoplay: {
-                    delay: 5000,
-                    disableOnInteraction: false,
+                    delay: 5000,               // 5 секунд
+                    disableOnInteraction: false, // Не зупинятися після свайпу пальцем
+                    pauseOnMouseEnter: false,    // Не зупинятися при наведенні
                 },
                 
                 pagination: {
@@ -568,9 +570,11 @@
                 spaceBetween: 20,     
                 centeredSlides: true, 
                 loop: true,
-                autoplay: { 
-                    delay: 5000, 
-                    disableOnInteraction: false 
+                // !!! НАЛАШТУВАННЯ АВТОПРОКРУТКИ !!!
+                autoplay: {
+                    delay: 5000,               // 5 секунд
+                    disableOnInteraction: false, // Не зупинятися після свайпу пальцем
+                    pauseOnMouseEnter: false,    // Не зупинятися при наведенні
                 },
                 
                 navigation: { 
