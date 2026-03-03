@@ -2393,4 +2393,87 @@ html, body {
         margin-right: 0 !important;
         z-index: 10005;
     }
+}/* =============================================
+   🛒 РОЗУМНИЙ КОШИК (В МЕНЮ НА ПК, БІЛЯ БУРГЕРА НА МОБІЛЬНОМУ)
+   ============================================= */
+
+/* Базові налаштування кошика */
+.cart-trigger {
+    display: flex !important;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+    z-index: 10005;
+}
+
+#cart-count {
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    background: #00F0FF;
+    color: #000;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- ПК ВЕРСІЯ (Екран більше 768px) --- */
+@media (min-width: 769px) {
+    .navbar {
+        display: flex;
+        align-items: center;
+        width: 100%;
+    }
+
+    .menu {
+        /* Розтягуємо темний бокс вправо, щоб він створив місце для кошика */
+        padding-right: 100px !important; 
+        margin-left: auto; /* Притискаємо бокс вправо */
+    }
+
+    .cart-trigger {
+        /* Зсовуємо кошик вліво, щоб він став прямо на темний фон боксу */
+        position: absolute !important;
+        right: 40px !important; /* Відстань від правого краю екрана */
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        z-index: 10005;
+    }
+}
+
+/* --- МОБІЛЬНА ВЕРСІЯ (Екран менше 768px) --- */
+@media (max-width: 768px) {
+    .navbar {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        width: 100%;
+        padding: 15px 20px !important;
+    }
+
+    .logo {
+        margin-right: auto !important; 
+        margin-left: 0 !important;
+        z-index: 10005;
+    }
+
+    .cart-trigger {
+        /* На телефоні скасовуємо накладання і ставимо в ряд з бургером */
+        position: relative !important;
+        right: auto !important;
+        top: auto !important;
+        transform: none !important;
+        margin-right: 20px !important; /* Відступ між кошиком і бургером */
+    }
+
+    .menu-toggle {
+        display: flex !important;
+        margin-right: 0 !important;
+        z-index: 10005;
+    }
 }
