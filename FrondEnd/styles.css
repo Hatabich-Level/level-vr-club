@@ -2075,6 +2075,213 @@ html, body {
 }
 
 /* =============================================
+   🏁 ОНОВЛЕНА АДАПТАЦІЯ (MOBILE FIX)
+   Вставте це замість старого медіа-запиту
+   ============================================= */
+
+/* --- АДАПТАЦІЯ ПІД ТЕЛЕФОНИ (до 768px) --- */
+@media (max-width: 768px) {
+
+    /* 1. ВИПРАВЛЯЄМО ГОЛОВНИЙ ЕКРАН (HERO) */
+    
+    /* Ховаємо декорації, які заважають на малому екрані */
+    .made-by, .made-by2, .social-main, .secondbg, .text-blur {
+        display: none !important;
+    }
+
+    /* Вирівнюємо головний текст */
+    .main-text {
+        order: 1 !important; /* Змушує текст бути першим */
+        width: 100%;
+        margin: 0 !important;
+        padding: 0 20px !important;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        z-index: 5;
+    }
+
+    /* Зменшуємо гігантський шрифт заголовка */
+    .text-outline, .text-solid {
+        font-size: 55px !important;
+        line-height: 1.1;
+        width: 100%;
+        text-align: center;
+        margin-left: 0 !important;
+    }
+
+    /* Виправляємо підзаголовок */
+    .sub-text {
+        font-size: 1rem;
+        margin-top: 20px;
+        text-align: center;
+        margin-left: 0 !important;
+    }
+
+    /* Кнопка "Забронювати" по центру */
+    .booking-btn {
+        font-size: 1.2rem;
+        padding: 15px 40px;
+        margin: 20px auto 0 auto !important; 
+        display: block;
+        width: fit-content;
+    }
+
+    /* !!! ОНОВЛЕНО: Картинка Кіборга - опускаємо нижче !!! */
+    .hero {
+        order: 2 !important; /* Змушує фотку бути під текстом */
+        position: relative !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 45vh !important; /* Займає нижню частину екрана */
+        object-fit: contain !important;
+        object-position: bottom center !important;
+        opacity: 0.8;
+        
+        /* Ця команда притискає картинку до самого низу екрана */
+        margin-top: auto !important; 
+        margin-bottom: 0 !important;
+    }
+
+    /* Шапка (Header) тепер не на весь екран, а по контенту */
+    header {
+        height: auto;
+        min-height: 100vh;
+        background: #000; /* Чорний фон замість картинки, якщо треба */height: auto !important;
+        min-height: 100vh !important;
+        background: #000 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        padding-top: 100px !important; /* Місце для шапки з логотипом */
+        position: relative;
+    }
+
+    /* 2. ВИПРАВЛЯЄМО СЕКЦІЮ "ПРО НАС" */
+    .about-cards {
+        grid-template-columns: 1fr !important; /* Одна картка в ряд */
+        padding: 0 15px;
+    }
+
+    #about .section-title {
+        font-size: 2.5rem;
+        text-align: center;
+    }
+
+    /* 3. ВИПРАВЛЯЄМО ФУТЕР (КОНТАКТИ) */
+    footer {
+        height: auto; /* Висота підлаштовується під текст */
+        padding: 50px 20px;
+    }
+
+    /* Ховаємо величезний напис на фоні або зменшуємо його */
+    .footer-text {
+        font-size: 3rem !important;
+        position: relative;
+        left: 0 !important;
+        transform: none !important;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    /* Блок з контактами */
+    .contact {
+        position: relative;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 40px;
+        gap: 10px;
+    }
+    
+    .contact .cyber-line {
+        display: none; /* Прибираємо лінію на телефоні */
+    }
+
+    /* Вирівнюємо колонки футера */
+    .footer {
+        position: relative;
+        transform: none !important;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 30px;
+    }
+
+    .social, .navigation {
+        flex-direction: column;
+        align-items: center;
+        display: flex;
+    }
+
+    .soc-text {
+        margin-right: 0;
+        margin-bottom: 10px;
+        text-align: center;
+        width: auto;
+    }
+
+    .social-icon {
+        margin: 0 10px 10px 10px;
+    }
+
+    /* !!! ОНОВЛЕНО: Приховати копірайт-надпис знизу !!! */
+    .copyright {
+        display: none;
+    }
+    
+    .footer-coment {
+        display: none; /* Залишили дисплей нон для "///CONTACT ЗАВАНАТАЖЕННЯ..." */
+    }
+    
+    /* 4. МОБІЛЬНЕ МЕНЮ (БУРГЕР) */
+    /* Логотип трохи лівіше */
+    .logo {
+        margin-left: 15px !important;
+    }
+    
+    .logo svg {
+        height: 40px; /* Трохи менший лого */
+    }
+
+    /* Меню на весь екран */
+    .menu {
+        position: fixed;
+        top: 0;
+        left: -100%; /* Сховане зліва */
+        width: 100%;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.95);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: 0.4s;
+        padding: 0;
+        clip-path: none; /* Прибираємо зрізані кути */
+        margin: 0;
+    }
+
+    .menu.active {
+        left: 0;
+    }
+
+    .menu a {
+        font-size: 1.5rem;
+        margin: 15px 0;
+        display: block;
+    }
+    
+    .menu-toggle {
+        display: flex;
+        margin-right: 20px;
+    }
+}
+
+/* =============================================
    🖥️ ФІКС ДЛЯ ПК (ПОВЕРТАЄМО СІТКУ)
    Вставте це в самий низ файлу
    ============================================= */
@@ -2124,5 +2331,66 @@ html, body {
     .vr-next, .vr-prev, .vr-pagination,
     .ps-next, .ps-prev, .ps-pagination {
         display: none !important;
+    }
+}
+
+/* =============================================
+   🛒 ФІКС: КОШИК БІЛЯ БУРГЕРА (ДЛЯ ВСІХ ЕКРАНІВ)
+   ============================================= */
+
+/* Базові налаштування кошика, щоб він ніколи не зникав */
+.cart-trigger {
+    display: flex !important;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+    z-index: 10005;
+}
+
+#cart-count {
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    background: #00F0FF;
+    color: #000;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* АДАПТАЦІЯ ПІД ТЕЛЕФОН */
+@media (max-width: 768px) {
+    /* Робимо шапку гнучкою, щоб елементи стали в ряд */
+    .navbar {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important; /* Притискаємо все вправо */
+        width: 100%;
+        padding: 15px 20px !important;
+    }
+
+    /* Логотип штовхає кошик і бургер вправо */
+    .logo {
+        margin-right: auto !important; 
+        margin-left: 0 !important;
+        z-index: 10005;
+    }
+
+    /* Кошик */
+    .cart-trigger {
+        margin-right: 20px !important; /* Відступ між кошиком і бургером */
+        margin-left: 0 !important;
+    }
+
+    /* Бургер */
+    .menu-toggle {
+        display: flex !important;
+        margin-right: 0 !important;
+        z-index: 10005;
     }
 }
