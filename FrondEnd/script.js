@@ -234,8 +234,9 @@ async function submitOrder() {
       comment: comment
     };
 
-    // Звертаємося до нашого бекенду
-    const response = await fetch('http://localhost:10000/api/book', {
+    
+   // Звертаємося до нашого бекенду на Render
+    const response = await fetch('https://level-vr-club.onrender.com/api/book', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
