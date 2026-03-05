@@ -243,19 +243,30 @@ async function submitOrder() {
       body: JSON.stringify(orderData)
     });
 
-    const data = await response.json();
+const data = await response.json();
 
     if (data.success) {
-      alert("✅ Бронювання успішно надіслано! Менеджер зв'яжеться з вами.");
+      // --- УВАГА: Заміни "level_vr_bot" на реальний юзернейм твого бота! ---
+      const botUsername = "priwetabot"; 
+      const orderId = data.orderId;
+
+      const userWantsBot = confirm(`✅ Бронювання #${orderId} успішно створено!\n\nНатисніть "ОК", щоб перейти в нашого Telegram-бота та отримати квиток із підтвердженням.`);
+      
+      if (userWantsBot) {
+         // Перекидаємо клієнта в бота з його унікальним номером замовлення
+         window.open(`https://t.me/${botUsername}?start=order_${orderId}`, '_blank');
+      }
+
       clearCart(); 
       closeModal(); 
     } else {
+      // ТУТ БУЛА ПОМИЛКА: не вистачало цього рядка і дужок нижче
       throw new Error(data.message || "Помилка обробки на сервері");
     }
 
   } catch (error) {
     console.error("❌ Помилка відправки:", error);
-    alert(`Помилка: ${error.message}. Перевір, чи працює локальний сервер (node server.js)!`);
+    alert(`Помилка: ${error.message}. Перевір, чи працює сервер!`);
   } finally {
     isSubmitting = false;
     if(submitBtn) submitBtn.innerText = "ПІДТВЕРДИТИ";
