@@ -6,6 +6,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { Pool } = require('pg');
 const TelegramBot = require('node-telegram-bot-api');
+const cron = require('node-cron');
 
 const app = express();
 const server = http.createServer(app);
@@ -196,6 +197,88 @@ app.post('/api/book', async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ success: false, message: 'Помилка сервера' });
+  }
+});
+
+
+// ===== API ПЕРЕВІРКИ ДОСТУПНОСТІ (Для сайту) =====
+app.post('/api/check-time', async (req, res) => {
+  try {
+    const { cart, date, time } = req.body;
+    if (!cart || cart.length === 0 || !date || !time) return res.json({ available: true });
+
+    const INVENTORY = { "PS 5 Pro": 3, "Oculus": 2, "PS VR 2": 1, "VIP": 1 };
+    const timeToMins = (t) => t.split(':').map(Number).reduce((h, m) => h * 60 + m);
+    const newStart = timeToMins(time);
+
+    const dbRes = await pool.query('SELECT booking_time, cart_details FROM bookings WHERE booking_date = $1', [date]);
+    const currentCartCounts = {};
+
+    for (const newItem of cart) {
+      const deviceName = newItem.device;
+      const newEnd = newStart + (newItem.duration * 60); 
+      let alreadyBookedCount = currentCartCounts[deviceName] || 0;
+
+      for (const booking of dbRes.rows) {
+        const existStart = timeToMins(booking.booking_time);
+        const existCart = typeof booking.cart_details === 'string' ? JSON.parse(booking.cart_details) : booking.cart_details;
+        
+        for (const existItem of existCart) {
+          if (existItem.device === deviceName) {
+            const existEnd = existStart + (existItem.duration * 60);
+            if (newStart < existEnd && newEnd > existStart) alreadyBookedCount += 1; 
+          }
+        }
+      }
+
+      const maxAllowed = INVENTORY[deviceName] || 1;
+      if (alreadyBookedCount >= maxAllowed) {
+        // Якщо хоча б один пристрій зайнято — повертаємо false
+        return res.json({ 
+          available: false, 
+          message: `Вибачте, на ${time} "${deviceName}" вже зайнято. Оберіть інший час!` 
+        });
+      }
+      currentCartCounts[deviceName] = (currentCartCounts[deviceName] || 0) + 1;
+    }
+
+    res.json({ available: true });
+  } catch (err) {
+    res.json({ available: true }); // У разі помилки пропускаємо перевірку
+  }
+});
+
+// ===== АВТОМАТИЧНІ НАГАДУВАННЯ (за 1 годину до гри) =====
+// Цей код запускається автоматично кожну 1 хвилину
+cron.schedule('* * * * *', async () => {
+  try {
+    // Отримуємо поточний час за Києвом
+    const now = new Date();
+    const kievTime = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Kiev', hour12: false, hour: 'numeric', minute: 'numeric' }).format(now);
+    const kievDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Kiev' })).toISOString().split('T')[0];
+    
+    const [currentHour, currentMinute] = kievTime.split(':').map(Number);
+    const currentTotalMins = currentHour * 60 + currentMinute;
+    
+    // Шукаємо замовлення на сьогодні, де клієнт підключив бота
+    const res = await pool.query(
+      "SELECT id, name, booking_time, client_chat_id FROM bookings WHERE booking_date = $1 AND client_chat_id IS NOT NULL", 
+      [kievDate]
+    );
+
+    res.rows.forEach(booking => {
+      const [bookHour, bookMinute] = booking.booking_time.split(':').map(Number);
+      const bookTotalMins = bookHour * 60 + bookMinute;
+
+      // Якщо до гри залишається РІВНО 60 хвилин
+      if (bookTotalMins - currentTotalMins === 60) {
+        const msg = `🔔 <b>НАГАДУВАННЯ!</b>\n\n${booking.name}, ваша гра у LEVEL VR CLUB почнеться рівно через годину (о <b>${booking.booking_time}</b>).\n\nЧекаємо на вас! 🎮`;
+        bot.sendMessage(booking.client_chat_id, msg, { parse_mode: 'HTML' });
+        console.log(`Відправлено нагадування для замовлення #${booking.id}`);
+      }
+    });
+  } catch (err) {
+    console.error('Помилка системи нагадувань:', err);
   }
 });
 
