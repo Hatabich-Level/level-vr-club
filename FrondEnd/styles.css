@@ -2477,3 +2477,53 @@ html, body {
         z-index: 10005;
     }
 }
+
+/* Ховаємо бокову кнопку на великих екранах */
+.mobile-side-btn {
+  display: none;
+}
+
+/* Налаштування тільки для телефонів (екрани менші за 768px) */
+@media (max-width: 768px) {
+  .mobile-side-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;        
+    right: 0;               
+    top: 160%;               
+    transform: translateY(-50%);
+    
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    
+    background-color: #bd1052; /* Твій фірмовий колір */
+    color: white;
+    padding: 30px 12px; /* Трохи збільшив відступи, щоб форма читалася краще */
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    
+    /* 🔥 МАГІЯ ФОРМИ (Кіберпанк-зрізи замість заокруглень) 🔥 */
+    clip-path: polygon(
+      100% 0,                  /* Верхній правий кут */
+      100% 100%,               /* Нижній правий кут */
+      15px 100%,               /* Початок зрізу знизу */
+      0 calc(100% - 15px),     /* Кінець зрізу знизу (лівий край) */
+      0 15px,                  /* Початок зрізу зверху (лівий край) */
+      15px 0                   /* Кінець зрізу зверху */
+    );
+    
+    /* Світіння, яке ідеально повторює скошені краї */
+    filter: drop-shadow(-4px 0px 8px rgba(189, 16, 82, 0.6));
+    
+    z-index: 9999;          
+    cursor: pointer;
+  }
+
+  /* Ховаємо центральну кнопку на телефоні (якщо ще не сховав) */
+  .booking-btn { 
+    display: none; 
+    }
+}
