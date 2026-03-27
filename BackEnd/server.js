@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const { Pool } = require('pg');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
+const ownerChatId = process.env.OWNER_CHAT_ID;
 
 const app = express();
 const server = http.createServer(app);
@@ -284,3 +285,88 @@ cron.schedule('* * * * *', async () => {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
+
+process.on('uncaughtException', (err) => {
+  console.error(err);
+  if (ownerChatId) {
+    bot.sendMessage(ownerChatId, `💥 CRASH!\n\n${err.message}`);
+  }
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error(err);
+  if (ownerChatId) {
+    bot.sendMessage(ownerChatId, `⚠️ ERROR:\n\n${err}`);
+  }
+});
+
+const axios = require('axios');
+
+const SITE_URL = 'https://level-vr-club.vn.ua/';
+
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    await axios.get(SITE_URL);
+  } catch (err) {
+    if (ownerChatId) {
+      bot.sendMessage(ownerChatId, `❌ САЙТ ЛІГ!\n\n${err.message}`);
+    }
+  }
+});
+
+bot.onText(/\/status/, async (msg) => {
+  if (msg.chat.id.toString() !== ownerChatId) return;
+
+  try {
+    await pool.query('SELECT 1');
+    bot.sendMessage(ownerChatId, '✅ Все працює нормально');
+  } catch (err) {
+    bot.sendMessage(ownerChatId, '❌ Проблема з базою');
+  }
+});
+
+let isDown = false;
+
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    await axios.get(SITE_URL);
+    isDown = false;
+  } catch (err) {
+    if (!isDown) {
+      isDown = true;
+      bot.sendMessage(ownerChatId, `❌ САЙТ ЛІГ!`);
+    }
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`🚀 Сервер на порту ${PORT}`);
+
+  if (ownerChatId) {
+    bot.sendMessage(ownerChatId, `🚀 Сервер запущено!\n\nПорт: ${PORT}\nЧас: ${new Date().toLocaleString()}`);
+  }
+});
+
+let onlineUsers = 0;
+
+io.on('connection', (socket) => {
+  onlineUsers++;
+
+  if (ownerChatId) {
+    bot.sendMessage(ownerChatId, `👤 Онлайн: ${onlineUsers}`);
+  }
+
+  socket.on('disconnect', () => {
+    onlineUsers--;
+
+    if (ownerChatId) {
+      bot.sendMessage(ownerChatId, `👤 Онлайн: ${onlineUsers}`);
+    }
+  });
+});
+
+bot.onText(/\/online/, (msg) => {
+  if (msg.chat.id.toString() !== ownerChatId) return;
+
+  bot.sendMessage(ownerChatId, `👥 Зараз онлайн: ${onlineUsers}`);
+});
