@@ -41,6 +41,8 @@ const pool = new Pool({
 
 (async () => {
   const client = await pool.connect();
+  
+  // Таблиця замовлень (вже є)
   await client.query(`
     CREATE TABLE IF NOT EXISTS bookings (
       id SERIAL PRIMARY KEY,
@@ -55,8 +57,22 @@ const pool = new Pool({
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // НОВА ТАБЛИЦЯ ДЛЯ ІГОР
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS games (
+      id SERIAL PRIMARY KEY,
+      title TEXT,
+      platform TEXT,
+      description TEXT,
+      image_url TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  
   client.release();
 })();
+
 
 /* ================= ONLINE ================= */
 let onlineUsers = 0;
@@ -107,6 +123,16 @@ app.post('/api/book', async (req, res) => {
   try {
     const { cart, totalPrice, date, time, name, phone, comment } = req.body;
 
+    // Форматуємо кошик для повідомлення (підлаштуйте ключі item.title/item.price під ваш фронтенд, якщо вони інші)
+    let cartText = '';
+    if (cart && cart.length > 0) {
+      cart.forEach((item, index) => {
+        cartText += `${index + 1}. ${item.title || item.name} - ${item.price} грн\n`;
+      });
+    } else {
+      cartText = 'Порожньо';
+    }
+
     const result = await pool.query(
       `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
@@ -115,9 +141,19 @@ app.post('/api/book', async (req, res) => {
 
     const id = result.rows[0].id;
 
+    // Створюємо текст за вашим шаблоном
+    const messageText = `👾 НОВЕ ЗАМОВЛЕННЯ #${id}!\n\n` +
+      `👤 Ім'я: ${name}\n` +
+      `📞 Телефон: ${phone}\n` +
+      `📅 Дата: ${date}\n` +
+      `⏰ Час: ${time}\n\n` +
+      `🛒 ЗАМОВЛЕННЯ:\n${cartText}\n` +
+      `💰 ЗАГАЛОМ: ${totalPrice} грн\n\n` +
+      `⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ`;
+
     await bot.sendMessage(
       ADMIN_CHAT_ID,
-      `🔥 <b>Замовлення #${id}</b>\n👤 ${name}\n📞 ${phone}\n📅 ${date} ${time}`,
+      messageText,
       {
         parse_mode: 'HTML',
         reply_markup: {
@@ -132,7 +168,8 @@ app.post('/api/book', async (req, res) => {
     );
 
     res.json({ success: true, orderId: id });
-  } catch {
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false });
   }
 });
@@ -141,34 +178,31 @@ app.post('/api/book', async (req, res) => {
 const cancelReasons = {};
 
 /* ================= CALLBACK ================= */
-bot.on('callback_query', async (q) => {
-  const action = q.data;
-  const id = action.split('_')[1];
-  const adminId = q.message.chat.id;
-
-  if (!isAdmin(adminId)) return;
-
-  if (action.startsWith('confirm_')) {
+if (action.startsWith('confirm_')) {
     const res = await pool.query('SELECT client_chat_id FROM bookings WHERE id=$1', [id]);
 
+    let notifyStatus = '❌ НЕ ПІДКЛЮЧЕНО (Бот не зміг написати)';
     if (res.rows[0]?.client_chat_id) {
-      bot.sendMessage(res.rows[0].client_chat_id, `✅ Бронювання #${id} підтверджено`);
+      bot.sendMessage(res.rows[0].client_chat_id, `✅ Бронювання #${id} підтверджено на ${res.rows[0].booking_time || 'ваш час'}`);
+      notifyStatus = '✅ НАДІСЛАНО КЛІЄНТУ';
     }
 
-    bot.editMessageText(q.message.text + `\n\n✅ ПІДТВЕРДЖЕНО`, {
+    // Замінюємо старий статус на новий у тексті повідомлення
+    const newText = q.message.text.replace(
+      '⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ', 
+      `✅ СТАТУС: ПІДТВЕРДЖЕНО\nСповіщення: ${notifyStatus}`
+    );
+
+    bot.editMessageText(newText, {
       chat_id: adminId,
       message_id: q.message.message_id,
-      parse_mode: 'HTML'
+      parse_mode: 'HTML' // Кнопки зникають автоматично, оскільки ми не передаємо reply_markup
     });
-  }
-
-  if (action.startsWith('cancel_')) {
+  } else if (action.startsWith('cancel_')) {
     cancelReasons[adminId] = id;
-    bot.sendMessage(adminId, `✏️ Напишіть причину для #${id}`);
+    bot.sendMessage(adminId, `❌ Введіть причину скасування замовлення #${id}`);
   }
 
-  bot.answerCallbackQuery(q.id);
-});
 
 /* ================= REASON ================= */
 bot.on('message', async (msg) => {
@@ -194,17 +228,28 @@ bot.on('message', async (msg) => {
 
 /* ================= REMINDER ================= */
 cron.schedule('* * * * *', async () => {
-  const now = new Date();
-  const current = now.getHours() * 60 + now.getMinutes();
+  // Отримуємо поточний час у часовому поясі Києва (щоб уникнути багів з UTC на сервері)
+  const kyivTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }));
+  
+  // Формуємо сьогоднішню дату у форматі YYYY-MM-DD
+  const todayStr = kyivTime.getFullYear() + '-' + 
+                   String(kyivTime.getMonth() + 1).padStart(2, '0') + '-' + 
+                   String(kyivTime.getDate()).padStart(2, '0');
+                   
+  const currentMinutes = kyivTime.getHours() * 60 + kyivTime.getMinutes();
 
-  const res = await pool.query('SELECT * FROM bookings');
+  // Шукаємо замовлення ТІЛЬКИ на сьогоднішню дату
+  const res = await pool.query('SELECT * FROM bookings WHERE booking_date=$1', [todayStr]);
 
   res.rows.forEach(b => {
+    if (!b.booking_time) return;
+    
     const [h, m] = b.booking_time.split(':');
-    const time = h * 60 + Number(m);
+    const bookingMinutes = parseInt(h) * 60 + parseInt(m);
 
-    if (time - current === 60 && b.client_chat_id) {
-      bot.sendMessage(b.client_chat_id, '🔔 Через годину гра!');
+    // Якщо до гри рівно 60 хвилин і є chat_id клієнта
+    if (bookingMinutes - currentMinutes === 60 && b.client_chat_id) {
+      bot.sendMessage(b.client_chat_id, `🔔 Нагадування: ваша гра в LEVEL VR CLUB почнеться о ${b.booking_time}!`);
     }
   });
 });
@@ -254,4 +299,53 @@ process.on('unhandledRejection', (err) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server ${PORT}`);
   bot.sendMessage(OWNER_CHAT_ID, `🚀 Сервер запущено`);
+});
+
+/* ================= ADMIN GAMES MANAGEMENT ================= */
+// Інструкція для адміна
+bot.onText(/\/addgame/, async (msg) => {
+  if (!isAdmin(msg.chat.id)) return;
+  
+  const text = `🎮 *Додавання нової гри*\n\n` +
+               `Відправте повідомлення у такому форматі (розділяючи знаком |):\n\n` +
+               `\`+гра | Платформа | Назва | Опис | Посилання на фото\`\n\n` +
+               `*Приклад:*\n` +
+               `\`+гра | PS5 | UFC 5 | Симулятор бойових мистецтв... | https://link.to/img.jpg\``;
+               
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+});
+
+// Обробка повідомлення з новою грою
+bot.on('message', async (msg) => {
+  if (!isAdmin(msg.chat.id) || !msg.text) return;
+
+  if (msg.text.startsWith('+гра |')) {
+    const parts = msg.text.split('|').map(p => p.trim());
+    
+    if (parts.length === 5) {
+      const [_, platform, title, description, imageUrl] = parts;
+      
+      try {
+        await pool.query(
+          'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4)', 
+          [title, platform, description, imageUrl]
+        );
+        bot.sendMessage(msg.chat.id, `✅ Гру <b>${title}</b> (${platform}) успішно додано до бази!`, { parse_mode: 'HTML' });
+      } catch (err) {
+        bot.sendMessage(msg.chat.id, `❌ Помилка БД: ${err.message}`);
+      }
+    } else {
+      bot.sendMessage(msg.chat.id, '❌ Помилка формату. Перевірте, чи всі 4 параметри вказані через `|`');
+    }
+  }
+});
+
+/* ================= GAMES ROUTE ================= */
+app.get('/api/games', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM games ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Помилка завантаження ігор' });
+  }
 });

@@ -2527,3 +2527,47 @@ html, body {
     display: none; 
     }
 }
+
+/* ================= CYBERPUNK BUTTON ================= */
+.cyber-btn-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 50px 0;
+}
+
+.cyber-button {
+    --primary-color: #00f0ff; 
+    --secondary-color: #fafafa; 
+    position: relative;
+    padding: 15px 40px;
+    font-family: 'Noto Sans', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    color: #000;
+    background-color: var(--primary-color);
+    text-transform: uppercase;
+    text-decoration: none;
+    letter-spacing: 3px;
+    border: none;
+    cursor: pointer;
+    /* Скошені кути */
+    clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+    transition: all 0.3s ease;
+    box-shadow: 0px 0px 15px rgba(248, 231, 28, 0.5);
+}
+
+.cyber-button:hover {
+    background-color: var(--secondary-color);
+    box-shadow: 0px 0px 25px var(--secondary-color);
+}
+
+.cyber-tag {
+    position: absolute;
+    bottom: -5px;
+    right: 5px;
+    font-size: 10px;
+    color: #000;
+    background: #fff;
+    padding: 2px 5px;
+    font-weight: bold;
+}
