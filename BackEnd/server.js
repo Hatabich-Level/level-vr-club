@@ -178,30 +178,43 @@ app.post('/api/book', async (req, res) => {
 const cancelReasons = {};
 
 /* ================= CALLBACK ================= */
-if (action.startsWith('confirm_')) {
-    const res = await pool.query('SELECT client_chat_id FROM bookings WHERE id=$1', [id]);
+bot.on('callback_query', async (q) => {
+  const adminId = q.from.id;
+  const action = q.data;
+  const id = action.split('_')[1]; // Отримуємо ID замовлення з callback_data
 
-    let notifyStatus = '❌ НЕ ПІДКЛЮЧЕНО (Бот не зміг написати)';
-    if (res.rows[0]?.client_chat_id) {
-      bot.sendMessage(res.rows[0].client_chat_id, `✅ Бронювання #${id} підтверджено на ${res.rows[0].booking_time || 'ваш час'}`);
-      notifyStatus = '✅ НАДІСЛАНО КЛІЄНТУ';
+  if (action.startsWith('confirm_')) {
+    try {
+      const res = await pool.query('SELECT client_chat_id, booking_time FROM bookings WHERE id=$1', [id]);
+
+      let notifyStatus = '❌ НЕ ПІДКЛЮЧЕНО (Бот не зміг написати)';
+      if (res.rows[0]?.client_chat_id) {
+        await bot.sendMessage(res.rows[0].client_chat_id, `✅ Бронювання #${id} підтверджено на ${res.rows[0].booking_time || 'ваш час'}`);
+        notifyStatus = '✅ НАДІСЛАНО КЛІЄНТУ';
+      }
+
+      // Замінюємо старий статус на новий у тексті повідомлення адміна
+      const newText = q.message.text.replace(
+        '⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ', 
+        `✅ СТАТУС: ПІДТВЕРДЖЕНО\nСповіщення: ${notifyStatus}`
+      );
+
+      await bot.editMessageText(newText, {
+        chat_id: adminId,
+        message_id: q.message.message_id,
+        parse_mode: 'HTML'
+      });
+    } catch (err) {
+      console.error('Помилка підтвердження:', err);
     }
-
-    // Замінюємо старий статус на новий у тексті повідомлення
-    const newText = q.message.text.replace(
-      '⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ', 
-      `✅ СТАТУС: ПІДТВЕРДЖЕНО\nСповіщення: ${notifyStatus}`
-    );
-
-    bot.editMessageText(newText, {
-      chat_id: adminId,
-      message_id: q.message.message_id,
-      parse_mode: 'HTML' // Кнопки зникають автоматично, оскільки ми не передаємо reply_markup
-    });
   } else if (action.startsWith('cancel_')) {
     cancelReasons[adminId] = id;
     bot.sendMessage(adminId, `❌ Введіть причину скасування замовлення #${id}`);
   }
+  
+  // Обов'язково відповідаємо на callback, щоб прибрати "годинник" на кнопці в Telegram
+  bot.answerCallbackQuery(q.id);
+});
 
 
 /* ================= REASON ================= */
