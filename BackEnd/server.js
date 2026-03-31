@@ -121,18 +121,15 @@ bot.onText(/\/today/, async (msg) => {
 /* ================= BOOK ================= */
 app.post('/api/book', async (req, res) => {
   try {
-    const { cart, totalPrice, date, time, name, phone, comment, clientChatId } = req.body;
+    const { cart = [], totalPrice, date, time, name, phone, comment, clientChatId } = req.body;
 
-    // 1. Спочатку зберігаємо в базу, щоб отримати ID замовлення (newId)
     const dbRes = await pool.query(
       `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, client_chat_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [name, phone, date, time, totalPrice, JSON.stringify(cart), comment, clientChatId]
     );
-
     const newId = dbRes.rows[0].id;
 
-    // 2. Формуємо повідомлення за твоїм шаблоном
     let tgMsg = `<b>👾 НОВЕ ЗАМОВЛЕННЯ #${newId}!</b>\n\n`;
     tgMsg += `👤 <b>Ім'я:</b> ${name}\n`;
     tgMsg += `📞 <b>Телефон:</b> <code>${phone}</code>\n`;
@@ -140,19 +137,17 @@ app.post('/api/book', async (req, res) => {
     tgMsg += `⏰ <b>Час:</b> ${time}\n\n`;
     tgMsg += `🛒 <b>ЗАМОВЛЕННЯ:</b>\n`;
 
-    // Цикл по кошику (використовуємо твої назви полів: device, duration, price)
+    // Перевіряємо різні назви полів (device або name)
     cart.forEach((item, idx) => {
-      tgMsg += `${idx + 1}. ${item.device} (${item.duration} год + 5 хв 🎁) — ${item.price} грн\n`;
+      const title = item.device || item.name || item.title || "Послуга";
+      const dur = item.duration || "?";
+      tgMsg += `${idx + 1}. ${title} (${dur} год + 5 хв 🎁) — ${item.price} грн\n`;
     });
 
     tgMsg += `\n💰 <b>ЗАГАЛОМ: ${totalPrice} грн</b>`;
+    if (comment && comment !== "Немає") tgMsg += `\n\n💬 <b>Коментар:</b> <i>${comment}</i>`;
+    tgMsg += `\n\n⏳ <b>СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ</b>`;
 
-    // Додаємо коментар, якщо він є
-    if (comment && comment !== "Немає" && comment.trim() !== "") {
-      tgMsg += `\n\n💬 <b>Коментар:</b> <i>${comment}</i>`;
-    }
-
-    // 3. Відправляємо в Telegram групу адмінів
     await bot.sendMessage(ADMIN_CHAT_ID, tgMsg, {
       parse_mode: 'HTML',
       reply_markup: {
@@ -166,10 +161,9 @@ app.post('/api/book', async (req, res) => {
     });
 
     res.json({ success: true, orderId: newId });
-
-  } catch (error) {
-    console.error('Помилка при створенні замовлення:', error);
-    res.status(500).json({ success: false, message: 'Помилка сервера' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 });
 
@@ -177,37 +171,35 @@ app.post('/api/book', async (req, res) => {
 const cancelReasons = {};
 
 /* ================= CALLBACK ================= */
-bot.on('callback_query', async (q) => {
-  const chatId = q.message.chat.id; // ID групи
-  const action = q.data;
-  const id = action.split('_')[1];
+bot.on('callback_query', async (query) => {
+  const action = query.data; // ВАЖЛИВО: Оголошуємо action!
+  const chatId = query.message.chat.id;
+  const messageId = query.message.message_id;
+  const orderId = action.split('_')[1];
 
-  if (action.startsWith('confirm_')) {
-    try {
-      const res = await pool.query('SELECT client_chat_id, booking_time FROM bookings WHERE id=$1', [id]);
-      let notifyStatus = '❌ Клієнт не підключений';
+  try {
+    if (action.startsWith('confirm_')) {
+      const res = await pool.query('SELECT client_chat_id, booking_time FROM bookings WHERE id = $1', [orderId]);
       
       if (res.rows[0]?.client_chat_id) {
-        await bot.sendMessage(res.rows[0].client_chat_id, `✅ Ваше бронювання #${id} на ${res.rows[0].booking_time} підтверджено!`);
-        notifyStatus = '✅ Клієнта сповіщено';
+        await bot.sendMessage(res.rows[0].client_chat_id, `✅ Замовлення #${orderId} підтверджено на ${res.rows[0].booking_time}!`);
       }
 
-      const newText = q.message.text.replace('⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ', `✅ ПІДТВЕРДЖЕНО\n📢 ${notifyStatus}`);
-      await bot.editMessageText(newText, { chat_id: chatId, message_id: q.message.message_id, parse_mode: 'HTML' });
-    } catch (err) { console.error(err); }
-    
-  } else if (action.startsWith('cancel_')) {
-    // Зберігаємо ID замовлення саме для цієї ГРУПИ
-    cancelReasons[chatId] = id; 
-    
-    // Отримуємо деталі, щоб адмін бачив, що він скасовує
-    const orderRes = await pool.query('SELECT name, booking_time FROM bookings WHERE id=$1', [id]);
-    const order = orderRes.rows[0];
-    
-    bot.sendMessage(chatId, `❌ <b>Скасування замовлення #${id}</b> (${order?.name || 'Н/Д'}, ${order?.booking_time || 'Н/Д'})\n\nБудь ласка, напишіть <b>причину</b> скасування у відповідь:`, { parse_mode: 'HTML' });
+      const updatedText = query.message.text.replace('⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ', '✅ СТАТУС: ПІДТВЕРДЖЕНО');
+      await bot.editMessageText(updatedText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML'
+      });
+    } 
+    else if (action.startsWith('cancel_')) {
+      cancelReasons[chatId] = orderId;
+      bot.sendMessage(chatId, `❌ Введіть причину скасування для #${orderId}:`);
+    }
+  } catch (e) {
+    console.error("Помилка кнопок:", e);
   }
-  
-  bot.answerCallbackQuery(q.id);
+  bot.answerCallbackQuery(query.id);
 });
 
 
