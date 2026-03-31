@@ -123,16 +123,21 @@ app.post('/api/book', async (req, res) => {
   try {
     const { cart, totalPrice, date, time, name, phone, comment } = req.body;
 
-    // Форматуємо кошик для повідомлення (підлаштуйте ключі item.title/item.price під ваш фронтенд, якщо вони інші)
+    // 1. Форматуємо список товарів (ігор/послуг)
     let cartText = '';
     if (cart && cart.length > 0) {
       cart.forEach((item, index) => {
-        cartText += `${index + 1}. ${item.title || item.name} - ${item.price} грн\n`;
+        // Перевіряємо різні варіанти назви поля (title або name), 
+        // щоб точно знайти назву товару
+        const itemName = item.title || item.name || 'Товар';
+        const itemPrice = item.price || 0;
+        cartText += `   ${index + 1}. <b>${itemName}</b> — ${itemPrice} грн\n`;
       });
     } else {
-      cartText = 'Порожньо';
+      cartText = '   <i>(Порожньо)</i>';
     }
 
+    // 2. Зберігаємо в базу (включаючи коментар)
     const result = await pool.query(
       `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
@@ -141,15 +146,17 @@ app.post('/api/book', async (req, res) => {
 
     const id = result.rows[0].id;
 
-    // Створюємо текст за вашим шаблоном
-    const messageText = `👾 НОВЕ ЗАМОВЛЕННЯ #${id}!\n\n` +
-      `👤 Ім'я: ${name}\n` +
-      `📞 Телефон: ${phone}\n` +
-      `📅 Дата: ${date}\n` +
-      `⏰ Час: ${time}\n\n` +
-      `🛒 ЗАМОВЛЕННЯ:\n${cartText}\n` +
-      `💰 ЗАГАЛОМ: ${totalPrice} грн\n\n` +
-      `⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ`;
+    // 3. Формуємо текст для адмінів з коментарем та списком ігор
+    const messageText = 
+      `👾 <b>НОВЕ ЗАМОВЛЕННЯ #${id}</b>\n\n` +
+      `👤 <b>Ім'я:</b> ${name}\n` +
+      `📞 <b>Телефон:</b> <code>${phone}</code>\n` +
+      `📅 <b>Дата:</b> ${date}\n` +
+      `⏰ <b>Час:</b> ${time}\n\n` +
+      `🛒 <b>ЩО ЗАМОВИЛИ:</b>\n${cartText}\n` +
+      `💬 <b>КОМЕНТАР:</b> ${comment ? `<i>${comment}</i>` : 'немає'}\n\n` +
+      `💰 <b>ЗАГАЛОМ:</b> <u>${totalPrice} грн</u>\n\n` +
+      `⏳ <b>СТАТУС:</b> ОЧІКУЄ ПІДТВЕРДЖЕННЯ`;
 
     await bot.sendMessage(
       ADMIN_CHAT_ID,
@@ -169,50 +176,44 @@ app.post('/api/book', async (req, res) => {
 
     res.json({ success: true, orderId: id });
   } catch (error) {
-    console.error(error);
+    console.error('Помилка бронювання:', error);
     res.status(500).json({ success: false });
   }
 });
-
 /* ================= CANCEL FLOW ================= */
 const cancelReasons = {};
 
 /* ================= CALLBACK ================= */
 bot.on('callback_query', async (q) => {
-  const adminId = q.from.id;
+  const chatId = q.message.chat.id; // ID групи
   const action = q.data;
-  const id = action.split('_')[1]; // Отримуємо ID замовлення з callback_data
+  const id = action.split('_')[1];
 
   if (action.startsWith('confirm_')) {
     try {
       const res = await pool.query('SELECT client_chat_id, booking_time FROM bookings WHERE id=$1', [id]);
-
-      let notifyStatus = '❌ НЕ ПІДКЛЮЧЕНО (Бот не зміг написати)';
+      let notifyStatus = '❌ Клієнт не підключений';
+      
       if (res.rows[0]?.client_chat_id) {
-        await bot.sendMessage(res.rows[0].client_chat_id, `✅ Бронювання #${id} підтверджено на ${res.rows[0].booking_time || 'ваш час'}`);
-        notifyStatus = '✅ НАДІСЛАНО КЛІЄНТУ';
+        await bot.sendMessage(res.rows[0].client_chat_id, `✅ Ваше бронювання #${id} на ${res.rows[0].booking_time} підтверджено!`);
+        notifyStatus = '✅ Клієнта сповіщено';
       }
 
-      // Замінюємо старий статус на новий у тексті повідомлення адміна
-      const newText = q.message.text.replace(
-        '⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ', 
-        `✅ СТАТУС: ПІДТВЕРДЖЕНО\nСповіщення: ${notifyStatus}`
-      );
-
-      await bot.editMessageText(newText, {
-        chat_id: adminId,
-        message_id: q.message.message_id,
-        parse_mode: 'HTML'
-      });
-    } catch (err) {
-      console.error('Помилка підтвердження:', err);
-    }
+      const newText = q.message.text.replace('⏳ СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ', `✅ ПІДТВЕРДЖЕНО\n📢 ${notifyStatus}`);
+      await bot.editMessageText(newText, { chat_id: chatId, message_id: q.message.message_id, parse_mode: 'HTML' });
+    } catch (err) { console.error(err); }
+    
   } else if (action.startsWith('cancel_')) {
-    cancelReasons[adminId] = id;
-    bot.sendMessage(adminId, `❌ Введіть причину скасування замовлення #${id}`);
+    // Зберігаємо ID замовлення саме для цієї ГРУПИ
+    cancelReasons[chatId] = id; 
+    
+    // Отримуємо деталі, щоб адмін бачив, що він скасовує
+    const orderRes = await pool.query('SELECT name, booking_time FROM bookings WHERE id=$1', [id]);
+    const order = orderRes.rows[0];
+    
+    bot.sendMessage(chatId, `❌ <b>Скасування замовлення #${id}</b> (${order?.name || 'Н/Д'}, ${order?.booking_time || 'Н/Д'})\n\nБудь ласка, напишіть <b>причину</b> скасування у відповідь:`, { parse_mode: 'HTML' });
   }
   
-  // Обов'язково відповідаємо на callback, щоб прибрати "годинник" на кнопці в Telegram
   bot.answerCallbackQuery(q.id);
 });
 
