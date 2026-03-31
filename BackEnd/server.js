@@ -121,65 +121,58 @@ bot.onText(/\/today/, async (msg) => {
 /* ================= BOOK ================= */
 app.post('/api/book', async (req, res) => {
   try {
-    const { cart, totalPrice, date, time, name, phone, comment } = req.body;
+    const { cart, totalPrice, date, time, name, phone, comment, clientChatId } = req.body;
 
-    // 1. Форматуємо список товарів (ігор/послуг)
-    let cartText = '';
-    if (cart && cart.length > 0) {
-      cart.forEach((item, index) => {
-        // Перевіряємо різні варіанти назви поля (title або name), 
-        // щоб точно знайти назву товару
-        const itemName = item.title || item.name || 'Товар';
-        const itemPrice = item.price || 0;
-        cartText += `   ${index + 1}. <b>${itemName}</b> — ${itemPrice} грн\n`;
-      });
-    } else {
-      cartText = '   <i>(Порожньо)</i>';
+    // 1. Спочатку зберігаємо в базу, щоб отримати ID замовлення (newId)
+    const dbRes = await pool.query(
+      `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, client_chat_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [name, phone, date, time, totalPrice, JSON.stringify(cart), comment, clientChatId]
+    );
+
+    const newId = dbRes.rows[0].id;
+
+    // 2. Формуємо повідомлення за твоїм шаблоном
+    let tgMsg = `<b>👾 НОВЕ ЗАМОВЛЕННЯ #${newId}!</b>\n\n`;
+    tgMsg += `👤 <b>Ім'я:</b> ${name}\n`;
+    tgMsg += `📞 <b>Телефон:</b> <code>${phone}</code>\n`;
+    tgMsg += `📅 <b>Дата:</b> ${date}\n`;
+    tgMsg += `⏰ <b>Час:</b> ${time}\n\n`;
+    tgMsg += `🛒 <b>ЗАМОВЛЕННЯ:</b>\n`;
+
+    // Цикл по кошику (використовуємо твої назви полів: device, duration, price)
+    cart.forEach((item, idx) => {
+      tgMsg += `${idx + 1}. ${item.device} (${item.duration} год + 5 хв 🎁) — ${item.price} грн\n`;
+    });
+
+    tgMsg += `\n💰 <b>ЗАГАЛОМ: ${totalPrice} грн</b>`;
+
+    // Додаємо коментар, якщо він є
+    if (comment && comment !== "Немає" && comment.trim() !== "") {
+      tgMsg += `\n\n💬 <b>Коментар:</b> <i>${comment}</i>`;
     }
 
-    // 2. Зберігаємо в базу (включаючи коментар)
-    const result = await pool.query(
-      `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-      [name, phone, date, time, totalPrice, JSON.stringify(cart), comment]
-    );
-
-    const id = result.rows[0].id;
-
-    // 3. Формуємо текст для адмінів з коментарем та списком ігор
-    const messageText = 
-      `👾 <b>НОВЕ ЗАМОВЛЕННЯ #${id}</b>\n\n` +
-      `👤 <b>Ім'я:</b> ${name}\n` +
-      `📞 <b>Телефон:</b> <code>${phone}</code>\n` +
-      `📅 <b>Дата:</b> ${date}\n` +
-      `⏰ <b>Час:</b> ${time}\n\n` +
-      `🛒 <b>ЩО ЗАМОВИЛИ:</b>\n${cartText}\n` +
-      `💬 <b>КОМЕНТАР:</b> ${comment ? `<i>${comment}</i>` : 'немає'}\n\n` +
-      `💰 <b>ЗАГАЛОМ:</b> <u>${totalPrice} грн</u>\n\n` +
-      `⏳ <b>СТАТУС:</b> ОЧІКУЄ ПІДТВЕРДЖЕННЯ`;
-
-    await bot.sendMessage(
-      ADMIN_CHAT_ID,
-      messageText,
-      {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '✅ Підтвердити', callback_data: `confirm_${id}` },
-              { text: '❌ Скасувати', callback_data: `cancel_${id}` }
-            ]
+    // 3. Відправляємо в Telegram групу адмінів
+    await bot.sendMessage(ADMIN_CHAT_ID, tgMsg, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Підтвердити', callback_data: `confirm_${newId}` },
+            { text: '❌ Скасувати', callback_data: `cancel_${newId}` }
           ]
-        }
+        ]
       }
-    );
+    });
 
-    res.json({ success: true, orderId: id });
+    res.json({ success: true, orderId: newId });
+
   } catch (error) {
-    console.error('Помилка бронювання:', error);
-    res.status(500).json({ success: false });
+    console.error('Помилка при створенні замовлення:', error);
+    res.status(500).json({ success: false, message: 'Помилка сервера' });
   }
 });
+
 /* ================= CANCEL FLOW ================= */
 const cancelReasons = {};
 
