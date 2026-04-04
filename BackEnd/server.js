@@ -30,6 +30,24 @@ const isOwner = (id) => id.toString() === OWNER_CHAT_ID;
 const isAdmin = (id) =>
   id.toString() === OWNER_CHAT_ID || id.toString() === ADMIN_CHAT_ID;
 
+
+/* ================= IGDB (TWITCH) API SETUP ================= */
+const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
+const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
+let igdbAccessToken = null;
+
+async function getIgdbToken() {
+    if (igdbAccessToken) return igdbAccessToken;
+    try {
+        const res = await axios.post(`https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_CLIENT_SECRET}&grant_type=client_credentials`);
+        igdbAccessToken = res.data.access_token;
+        return igdbAccessToken;
+    } catch (err) {
+        console.error("Помилка отримання токена Twitch:", err.message);
+        return null;
+    }
+}
+
 /* ================= BOT ================= */
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -314,29 +332,70 @@ bot.onText(/\/addgame/, async (msg) => {
   bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 });
 
-// Обробка повідомлення з новою грою
-bot.on('message', async (msg) => {
-  if (!isAdmin(msg.chat.id) || !msg.text) return;
 
-  if (msg.text.startsWith('+гра |')) {
-    const parts = msg.text.split('|').map(p => p.trim());
-    
-    if (parts.length === 5) {
-      const [_, platform, title, description, imageUrl] = parts;
-      
-      try {
-        await pool.query(
-          'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4)', 
-          [title, platform, description, imageUrl]
-        );
-        bot.sendMessage(msg.chat.id, `✅ Гру <b>${title}</b> (${platform}) успішно додано до бази!`, { parse_mode: 'HTML' });
-      } catch (err) {
-        bot.sendMessage(msg.chat.id, `❌ Помилка БД: ${err.message}`);
-      }
-    } else {
-      bot.sendMessage(msg.chat.id, '❌ Помилка формату. Перевірте, чи всі 4 параметри вказані через `|`');
+// Обробка повідомлення з новою грою (АВТОМАТИЧНО ЧЕРЕЗ IGDB)
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+
+    if (!isAdmin(chatId) || !text) return;
+
+    if (text.toLowerCase().startsWith('+додати ')) {
+        const gameName = text.replace('+додати ', '').trim();
+        
+        try {
+            bot.sendMessage(chatId, `🔍 Шукаю <b>${gameName}</b> у базі IGDB...`, { parse_mode: 'HTML' });
+
+            const token = await getIgdbToken();
+            if (!token) return bot.sendMessage(chatId, "❌ Помилка авторизації IGDB. Перевірте ключі в Render.");
+
+            const response = await axios({
+                url: 'https://api.igdb.com/v4/games',
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Client-ID': TWITCH_CLIENT_ID,
+                    'Authorization': `Bearer ${token}`
+                },
+                data: `search "${gameName}"; fields name, summary, platforms.name, cover.url; limit 1;`
+            });
+
+            if (response.data.length === 0) {
+                return bot.sendMessage(chatId, "❌ Гру не знайдено. Спробуйте точнішу назву англійською.");
+            }
+
+            const game = response.data[0];
+            
+            let imageUrl = "https://via.placeholder.com/500x700?text=No+Image";
+            if (game.cover && game.cover.url) {
+                imageUrl = 'https:' + game.cover.url.replace('t_thumb', 't_1080p');
+            }
+
+            const description = game.summary || "Опис відсутній.";
+            
+            const platforms = game.platforms ? game.platforms.map(p => p.name).join(', ') : "Невідомо";
+            let mainPlatform = 'Console';
+            if (platforms.includes('PlayStation 5')) mainPlatform = 'PS5';
+            else if (platforms.includes('PlayStation 4')) mainPlatform = 'PS4';
+            else if (platforms.includes('PC')) mainPlatform = 'PC';
+            else if (platforms.includes('VR')) mainPlatform = 'VR';
+
+            await pool.query(
+                'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4)',
+                [game.name, mainPlatform, description.substring(0, 500) + '...', imageUrl]
+            );
+
+            bot.sendPhoto(chatId, imageUrl, {
+                caption: `✅ <b>Гру автоматично додано!</b>\n\n🎮 <b>Назва:</b> ${game.name}\n🕹 <b>Платформи:</b> ${platforms}\n\n<i>Вона вже з'явилася на сайті.</i>`,
+                parse_mode: 'HTML'
+            });
+
+        } catch (err) {
+            console.error("Помилка IGDB:", err.response ? err.response.data : err.message);
+            if (err.response && err.response.status === 401) igdbAccessToken = null; 
+            bot.sendMessage(chatId, "❌ Сталася помилка при зверненні до бази ігор.");
+        }
     }
-  }
 });
 
 /* ================= GAMES ROUTE ================= */
