@@ -37,14 +37,14 @@
         </nav>
     </header>
 
-    <div class="games-section">
-        <h1 class="page-title">Наші Ігри</h1>
-        
-        <div id="games-loader" class="loader">Завантаження ігротеки...</div>
-        <div class="games-grid" id="games-container">
-
+    <main>
+        <div class="catalog-header">
+            <h1>Каталог ігор</h1>
+            <p id="games-loader">Завантаження ігор...</p>
         </div>
-    </div>
+
+        <div id="games-container"></div>
+    </main>
 
     <footer>
             <div class="footer-coment">
@@ -123,43 +123,45 @@
                 const container = document.getElementById('games-container');
                 const loader = document.getElementById('games-loader');
                 
-                loader.style.display = 'none';
-
                 if (games.length === 0) {
-                    container.innerHTML = '<p style="color: gray; text-align: center; grid-column: 1/-1;">Ігор поки немає, але скоро з’являться!</p>';
+                    loader.innerText = 'Ігор поки немає.';
                     return;
                 }
+                loader.style.display = 'none';
 
-                // Знайди функцію loadGames і заміни цикл games.forEach на цей:
-                // Логіка визначення кольору бейджа
+                let allCards = '';
+
                 games.forEach(game => {
-                    const platformClass = platform.includes('ps') ? 'ps5' : (platform.includes('vr') ? 'vr' : 'default');
+                    // Визначаємо клас для кольору бейджа (PS5 чи VR)
                     const platform = game.platform ? game.platform.toLowerCase() : '';
-                    // Перевірка на наявність зображення
-                    const coverImage = game.image_url || 'images/placeholder.jpg';
+                    const platformClass = platform.includes('ps') ? 'ps5' : (platform.includes('vr') ? 'vr' : 'default');
                     
+                    // Шлях до картинки з IGDB або заглушка
+                    const coverImage = game.image_url || 'images/placeholder.jpg';
+
+                    // Нова структура картки згідно з малюнком
                     const card = `
-                    <div class="game-card" style="background-image: url('${coverImage}');">
-                        <span class="platform-badge ${platformClass}">${game.platform}</span>
-                        
-                        <div class="game-overlay">
-                            <div class="game-info">
-                                <h2>${game.title}</h2>
+                        <div class="game-card" style="background-image: url('${coverImage}');">
+                            <span class="platform-badge ${platformClass}">${game.platform}</span>
+                            
+                            <div class="game-overlay">
+                                <div class="game-info">
+                                    <h2>${game.title}</h2>
                                 </div>
                                 <a href="/game/${game.id}" class="game-btn">DETAIL</a>
-                                </div>
-                                </div>
-                                `;
-                                container.innerHTML += card;
-                            });
-                            
+                            </div>
+                        </div>
+                    `;
+                    allCards += card;
+                });
+
+                container.innerHTML = allCards;
             } catch (error) {
                 console.error('Помилка завантаження:', error);
                 document.getElementById('games-loader').innerText = 'Помилка завантаження даних.';
             }
         }
 
-        // Запускаємо при завантаженні сторінки
         window.onload = loadGames;
     </script>
 
