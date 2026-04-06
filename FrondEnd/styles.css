@@ -2505,10 +2505,7 @@ html, body {
     cursor: pointer;
   }
 
-  /* Ховаємо центральну кнопку на телефоні (якщо ще не сховав) */
-  .booking-btn { 
-    display: none; 
-    }
+
 }
 /* ================= CYBERPUNK BUTTON ================= */
 .cyber-btn-wrapper {
@@ -2552,4 +2549,115 @@ html, body {
     background: #fff;
     padding: 2px 5px;
     font-weight: bold;
+}
+
+/* Контейнер для карток (Адаптивна сітка) */
+#games-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 30px;
+    padding: 40px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Сама картка */
+.game-card {
+    position: relative;
+    height: 420px;
+    background-size: cover;
+    background-position: center;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end; /* Притискає контент до низу */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.game-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+    border-color: #6f42c1; /* Фіолетовий акцент при наведенні */
+}
+
+/* Затемнення та плашка знизу */
+.game-overlay {
+    background: linear-gradient(to top, 
+        rgba(0, 0, 0, 0.95) 0%, 
+        rgba(0, 0, 0, 0.7) 50%, 
+        transparent 100%);
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.game-info h2 {
+    font-size: 1.1rem;
+    color: #ffffff;
+    margin: 0;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+}
+
+/* Кнопка DETAIL */
+.game-btn {
+    background-color: #ffffff;
+    color: #000000;
+    text-decoration: none;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    font-weight: 900;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    border: none;
+    flex-shrink: 0; /* Щоб кнопка не стискалася */
+}
+
+.game-btn:hover {
+    background-color: #6f42c1;
+    color: #ffffff;
+}
+
+/* Бейджі платформ (в кутку) */
+.platform-badge {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #fff;
+    text-transform: uppercase;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.platform-badge.ps5 { background: rgba(0, 55, 145, 0.9); border: 1px solid #003791; }
+.platform-badge.vr { background: rgba(255, 69, 0, 0.9); border: 1px solid #ff4500; }
+.platform-badge.default { background: rgba(51, 51, 51, 0.9); }
+
+/* Адаптація для мобільних пристроїв */
+@media (max-width: 600px) {
+    #games-container {
+        grid-template-columns: 1fr; /* По одній картці на ряд */
+        gap: 20px;
+    }
+    .game-card {
+        height: 350px;
+    }
+}
+
+.loader {
+    text-align: center;
+    color: #f8e71c;
+    font-size: 1.5rem;
+    margin-top: 50px;
 }
