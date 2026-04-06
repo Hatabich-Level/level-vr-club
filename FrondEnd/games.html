@@ -131,31 +131,37 @@
 
                 let allCards = '';
 
-                games.forEach(game => {
-                    // Визначаємо клас для кольору бейджа (PS5 чи VR)
-                    const platform = game.platform ? game.platform.toLowerCase() : '';
-                    const platformClass = platform.includes('ps') ? 'ps5' : (platform.includes('vr') ? 'vr' : 'default');
+                // Замініть тільки цей цикл всередині loadGames() у games.html
+games.forEach(game => {
+    // Шлях до картинки або заглушка
+    const coverImage = game.image_url || 'images/placeholder.jpg';
+    
+    // Платформа (для відображення тексту)
+    const platformName = game.platform || 'інша';
+
+    // Нова структура: .game-card -> .card-inner (flex) -> зліва картинка, справа деталі
+    const card = `
+        <div class="game-card" tabindex="0">
+            <div class="card-inner">
+                
+                <div class="card-image-section">
+                    <img src="${coverImage}" alt="${game.title}" class="game-thumbnail" onerror="this.src='images/placeholder.jpg'">
+                </div>
+                
+                <div class="card-details-section">
+                    <h2 class="game-title">${game.title}</h2>
+                    <p class="game-description">${game.description || "опис українською мовою..."}</p>
                     
-                    // Шлях до картинки з IGDB або заглушка
-                    const coverImage = game.image_url || 'images/placeholder.jpg';
-
-                    // Нова структура картки згідно з малюнком
-                    const card = `
-                        <div class="game-card" style="background-image: url('${coverImage}');">
-                            <span class="platform-badge ${platformClass}">${game.platform}</span>
-                            
-                            <div class="game-overlay">
-                                <div class="game-info">
-                                    <h2>${game.title}</h2>
-                                </div>
-                                <a href="/game/${game.id}" class="game-btn">DETAIL</a>
-                            </div>
-                        </div>
-                    `;
-                    allCards += card;
-                });
-
-                container.innerHTML = allCards;
+                    <div class="details-footer">
+                         <hr class="separator">
+                         <p class="game-platform">платформа: ${platformName}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    container.innerHTML += card;
+});
             } catch (error) {
                 console.error('Помилка завантаження:', error);
                 document.getElementById('games-loader').innerText = 'Помилка завантаження даних.';

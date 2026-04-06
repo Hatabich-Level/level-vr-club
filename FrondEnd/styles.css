@@ -2551,113 +2551,166 @@ html, body {
     font-weight: bold;
 }
 
-/* Контейнер для карток (Адаптивна сітка) */
+/* =============================================
+   🎮 РЕАЛІЗАЦІЯ РОЗШИРЮВАНОЇ КАРТКИ ЗА СХЕМОЮ
+   Видаліть старі стилі карток та вставте ці
+   ============================================= */
+
+/* Загальний контейнер карток (тепер flex-row) */
 #games-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    display: flex;
+    flex-wrap: wrap; /* Дозволяє переносити ряди */
     gap: 30px;
     padding: 40px 20px;
+    justify-content: center; /* Центруємо картки */
     max-width: 1400px;
     margin: 0 auto;
 }
 
-/* Сама картка */
+/* --- САМА КАРТКА --- */
 .game-card {
     position: relative;
-    height: 420px;
-    background-size: cover;
-    background-position: center;
+    /* ПОЧАТКОВИЙ РОЗМІР (Вертикальна картка) */
+    width: 250px; /* Базова ширина */
+    height: 380px; /* Базова висота */
+    
+    background: rgba(10, 10, 10, 0.9); /* Темний фон для кіберпанку */
+    border: 2px solid #00F0FF; /* Неоновий контур */
     border-radius: 16px;
+    overflow: hidden; /* Ховаємо праву панель */
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    
+    /* 🔥 МАГІЯ АНІМАЦІЇ: плавне розширення width 🔥 */
+    transition: width 0.4s ease-in-out, box-shadow 0.3s ease;
+    
+    box-sizing: border-box;
+    outline: none; /* Прибираємо стандартний контур при фокусі */
+}
+
+/* 🔥 ЕФЕКТ РОЗШИРЕННЯ (При наведенні АБО фокусі/натисканні на телефоні) 🔥 */
+.game-card:hover, .game-card:focus {
+    width: 650px; /* РОЗШИРЕНИЙ РОЗМІР (Велика горизонтальна панель) */
+    box-shadow: 0 8px 30px rgba(0,240,255,0.4);
+    z-index: 10; /* Піднімаємо поверх інших */
+}
+
+/* Внутрішній flex-контейнер */
+.card-inner {
+    display: flex;
+    height: 100%;
+    width: 100%; /* Обов'язково */
+}
+
+/* --- ЛІВА СЕКЦІЯ (Зображення ігри) --- */
+.card-image-section {
+    /* Ця секція завжди фіксована */
+    flex: 0 0 250px; /* Займає початкові 250px і не стискається */
+    height: 100%;
     overflow: hidden;
+    border-right: 1px solid rgba(0, 240, 255, 0.2); /* Тонка лінія */
+}
+
+.card-image-section img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Зберігає пропорції картинки */
+    filter: brightness(0.9);
+}
+
+/* --- ПРАВА СЕКЦІЯ (Деталі) --- */
+.card-details-section {
+    /* Ця секція займає весь простір, що звільнився при розширенні */
+    flex: 1; /* Гнучка ширина */
+    height: 100%;
+    padding: 25px;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end; /* Притискає контент до низу */
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+    justify-content: space-between; /* Розносить контент (текст top, платформа bottom) */
+    color: #eee;
+    
+    /* Спочатку прихована вмістом */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    transition-delay: 0.1s; /* З'являється після початку розширення */
 }
 
-.game-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 15px 30px rgba(0,0,0,0.5);
-    border-color: #6f42c1; /* Фіолетовий акцент при наведенні */
+/* Показуємо контент правої панелі при розширенні */
+.game-card:hover .card-details-section,
+.game-card:focus .card-details-section {
+    opacity: 1;
 }
 
-/* Затемнення та плашка знизу */
-.game-overlay {
-    background: linear-gradient(to top, 
-        rgba(0, 0, 0, 0.95) 0%, 
-        rgba(0, 0, 0, 0.7) 50%, 
-        transparent 100%);
-    padding: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* Заголовок гри всередині */
+.game-title {
+    font-size: 1.4rem;
+    color: #fff;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    font-weight: 900;
+    font-family: 'KogniGear', sans-serif;
+    letter-spacing: 1px;
+}
+
+/* Опис гри */
+.game-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #ccc;
+    overflow-y: auto; /* Скрол, якщо опис задовгий */
+    margin-bottom: 20px;
+    /* Стилізація скролбару (темна тема) */
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+}
+
+/* Футер деталей (Платформа) */
+.details-footer {
+    width: 100%;
+    text-align: center; /* Центрування як на малюнку */
+}
+
+/* Горизонтальна лінія */
+.separator {
+    border: 0;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    margin: 15px 0;
     width: 100%;
 }
 
-.game-info h2 {
-    font-size: 1.1rem;
-    color: #ffffff;
-    margin: 0;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1.2;
-}
-
-/* Кнопка DETAIL */
-.game-btn {
-    background-color: #ffffff;
-    color: #000000;
-    text-decoration: none;
-    padding: 8px 16px;
-    font-size: 0.8rem;
+/* Текст платформи */
+.game-platform {
     font-weight: 900;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    border: none;
-    flex-shrink: 0; /* Щоб кнопка не стискалася */
-}
-
-.game-btn:hover {
-    background-color: #6f42c1;
-    color: #ffffff;
-}
-
-/* Бейджі платформ (в кутку) */
-.platform-badge {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    padding: 5px 12px;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    font-weight: 800;
-    color: #fff;
+    font-size: 1.1rem;
+    color: #F8E71C; /* Фірмовий жовтий */
     text-transform: uppercase;
-    backdrop-filter: blur(5px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    letter-spacing: 1px;
 }
 
-.platform-badge.ps5 { background: rgba(0, 55, 145, 0.9); border: 1px solid #003791; }
-.platform-badge.vr { background: rgba(255, 69, 0, 0.9); border: 1px solid #ff4500; }
-.platform-badge.default { background: rgba(51, 51, 51, 0.9); }
-
-/* Адаптація для мобільних пристроїв */
-@media (max-width: 600px) {
+/* --- АДАПТАЦІЯ ПІД МОБІЛЬНІ ПРИСТРОЇ --- */
+@media (max-width: 768px) {
     #games-container {
-        grid-template-columns: 1fr; /* По одній картці на ряд */
         gap: 20px;
     }
+    
+    /* На телефонах розширюємо на меншу ширину */
     .game-card {
-        height: 350px;
+        width: 100%; /* Займає майже весь екран по ширині */
+        max-width: 300px; /* Але не більше 300px спочатку */
+        height: 400px;
     }
-}
 
-.loader {
-    text-align: center;
-    color: #f8e71c;
-    font-size: 1.5rem;
-    margin-top: 50px;
+    /* При натисканні на телефоні розширюємо */
+    .game-card:focus {
+        width: 100%; /* На весь доступний простір контейнера */
+        max-width: 100%; 
+        height: 350px; /* Зменшуємо висоту */
+    }
+
+    .card-image-section {
+        flex: 0 0 160px; /* Менша картинка на телефоні */
+    }
+    
+    .game-title { font-size: 1.1rem; }
+    .game-description { font-size: 0.85rem; }
 }
