@@ -2589,8 +2589,8 @@ html, body {
 
 /* 🔥 ЕФЕКТ РОЗШИРЕННЯ 🔥 */
 .game-card:hover, .game-card:focus {
-    /* Розширюємо до 550px, щоб 4-та картка НЕ падала вниз! */
-    flex: 0 0 550px; 
+    /* ЗМЕНШИЛИ з 550px до 460px, щоб 4-та гра не падала вниз */
+    flex: 0 0 460px; 
     box-shadow: 0 8px 30px rgba(0,240,255,0.4);
     z-index: 10;
 }
@@ -2718,4 +2718,15 @@ html, body {
     text-align: center;
     margin-top: 10px; /* Зробили мінімальний відступ від меню */
     margin-bottom: 20px;
+}
+
+/* Забираємо пустоту на сторінці ігор */
+.games-header {
+    height: auto !important;
+    min-height: 80px !important;
+}
+
+/* Додаємо відступ зверху, щоб фіксоване меню не перекривало заголовок */
+.games-section {
+    padding-top: 120px; 
 }
