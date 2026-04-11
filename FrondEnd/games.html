@@ -34,6 +34,21 @@
                 <a href="index.html#contact">Контакти</a> 
             </div>
 
+            <div class="cart-trigger" onclick="toggleCart()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <span id="cart-count">0</span>
+            </div>
+
+            <div class="menu-toggle" id="menuToggle">
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+
         </nav>
     </header>
 
@@ -132,42 +147,48 @@
                 let allCards = '';
 
                 // Замініть тільки цей цикл всередині loadGames() у games.html
-games.forEach(game => {
-    // Шлях до картинки або заглушка
-    const coverImage = game.image_url || 'images/placeholder.jpg';
-    
-    // Платформа (для відображення тексту)
-    const platformName = game.platform || 'інша';
-
-    // Нова структура: .game-card -> .card-inner (flex) -> зліва картинка, справа деталі
-    const card = `
-        <div class="game-card" tabindex="0">
-            <div class="card-inner">
                 
-                <div class="card-image-section">
-                    <img src="${coverImage}" alt="${game.title}" class="game-thumbnail" onerror="this.src='images/placeholder.jpg'">
-                </div>
-                
-                <div class="card-details-section">
-                    <h2 class="game-title">${game.title}</h2>
-                    <p class="game-description">${game.description || "опис українською мовою..."}</p>
+                games.forEach(game => {
+                    // Шлях до картинки або заглушка
+                    const coverImage = game.image_url || 'images/placeholder.jpg';
                     
-                    <div class="details-footer">
-                         <hr class="separator">
-                         <p class="game-platform">платформа: ${platformName}</p>
+                    // Платформа (для відображення тексту)
+                    const platformName = game.platform || 'інша';
+                    
+                    // Нова структура: .game-card -> .card-inner (flex) -> зліва картинка, справа деталі
+                    
+                    const card = `
+                    <div class="game-card" tabindex="0">
+                        <div class="card-inner">
+                            
+                            <div class="card-image-section">
+                                <img src="${coverImage}" alt="${game.title}" class="game-thumbnail" onerror="this.src='images/placeholder.jpg'">
+                            </div>
+                                
+                            <div class="card-details-section">
+                                <div>
+                                    <h2 class="game-title">${game.title}</h2>
+                                    <p class="game-description">${game.description || "Професійна VR гра для гравців усіх рівнів."}</p>
+                                </div>
+                                
+                                <div class="details-footer">
+                                    <hr class="separator">
+                                    <p class="game-platform">платформа: ${platformName}</p>
+                                </div>
+                            </div>
+                                        
+                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    `;
-    container.innerHTML += card;
-});
+                    `;
+                    allCards += card;
+                });
+                container.innerHTML = allCards;
             } catch (error) {
                 console.error('Помилка завантаження:', error);
                 document.getElementById('games-loader').innerText = 'Помилка завантаження даних.';
             }
         }
-
+        
         window.onload = loadGames;
     </script>
 

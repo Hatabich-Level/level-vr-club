@@ -42,7 +42,7 @@ nav ul {
 .made-by {
     position: absolute;
     top: 100px;
-    left: 80px;
+    left: 40px;
 
 }
 
@@ -62,7 +62,7 @@ nav ul {
 .made-by2 {
     position: absolute;
     top: 100px;
-    right: 80px;
+    right: 40px;
 }
 
 .made-by2 span{
@@ -83,7 +83,7 @@ nav ul {
     flex-direction: column;
     position: absolute;
     bottom: 0;
-    left: 80px;
+    left: 45px;
     justify-content: center;
     z-index: 3;
 }
@@ -104,12 +104,12 @@ nav ul {
     position: absolute;
     z-index: 2;
     bottom: 0;
-    left: 60px;
+    left: 30px;
 
 }
 
 .main-text {
-    margin-right: 160px;
+    margin-right: 70px;
     color: #FCEAD6;
     z-index: 1;
     text-align: right;
@@ -136,7 +136,7 @@ nav ul {
 
 .text-blur {
     font-size: 240px;
-    padding-right: 60px;
+    padding-right: 0px;
     margin-bottom: -170px;
     opacity: 0.5;
     width: fit-content;
@@ -541,7 +541,7 @@ clip-path: polygon(
 .logo {
   display: flex;
   align-items: center;
-  margin-left: 80px;
+  margin-left: 40px;
 }
 @media (max-width: 768px) {
   .logo {
@@ -638,7 +638,7 @@ clip-path: polygon(
 /* --- САМЕ МОБІЛЬНЕ МЕНЮ --- */
 .menu {
     display: flex;
-    gap: 30px;
+    gap: 10px;
 }
 
 
@@ -2415,14 +2415,15 @@ html, body {
 
     .menu {
         /* Розтягуємо темний бокс вправо, щоб він створив місце для кошика */
-        padding-right: 100px !important; 
+        padding-right: 60px !important; 
         margin-left: auto; /* Притискаємо бокс вправо */
+        margin-right: 40px; /* Відстань від правого краю екрана */
     }
 
     .cart-trigger {
         /* Зсовуємо кошик вліво, щоб він став прямо на темний фон боксу */
         position: absolute !important;
-        right: 40px !important; /* Відстань від правого краю екрана */
+        right: 60px !important; /* Відстань від правого краю екрана */
         top: 50% !important;
         transform: translateY(-50%) !important;
         z-index: 10005;
@@ -2729,4 +2730,56 @@ html, body {
 /* Додаємо відступ зверху, щоб фіксоване меню не перекривало заголовок */
 .games-section {
     padding-top: 120px; 
+}
+
+/* --- Контейнер для зображення в картках "Про нас" --- */
+.about-card-image {
+    width: 100%;
+    height: 200px; /* Фіксована висота для рівномірності карток */
+    overflow: hidden; /* Ховаємо все, що вилазить за межі (для ефекту зуму) */
+    margin-bottom: 20px;
+    position: relative;
+    border-bottom: 2px solid #42BFDD; /* Неонова лінія, що підкреслює фото */
+    border-radius: 2px;
+}
+
+/* --- Саме зображення --- */
+.about-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Заповнює контейнер без спотворення пропорцій */
+    filter: brightness(0.8) contrast(1.1); /* Трохи приглушуємо яскравість для атмосфери */
+    transition: transform 0.4s ease, filter 0.4s ease; /* Плавність анімації */
+}
+
+/* --- Ефект при наведенні на картку --- */
+.about-card:hover .about-card-image img {
+    transform: scale(1.08); /* Легке наближення фото */
+    filter: brightness(1.1) contrast(1.1); /* Фото спалахує разом із неоновою рамкою картки */
+}
+
+/* --- АДАПТАЦІЯ ПІД ЕКРАНИ --- */
+
+/* Планшети (до 1024px) */
+@media (max-width: 1024px) {
+    .about-card-image {
+        height: 180px; /* Робимо фото трохи вужчими, щоб зекономити місце */
+    }
+}
+
+/* Телефони (до 768px) */
+@media (max-width: 768px) {
+    .about-card-image {
+        /* Оскільки на телефоні картка розтягується на всю ширину екрана (1 колонкою), 
+           фото можна зробити трохи вищим для ефектності */
+        height: 240px; 
+        margin-bottom: 15px;
+    }
+}
+
+/* Маленькі екрани телефонів (до 480px) */
+@media (max-width: 480px) {
+    .about-card-image {
+        height: 200px; /* Повертаємо компактний розмір */
+    }
 }
