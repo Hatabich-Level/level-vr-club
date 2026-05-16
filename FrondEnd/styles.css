@@ -2811,16 +2811,432 @@ html, body {
     color: #ccc;
 }
 
-
-
-
-
-
-
-
-
 .copyright {
     margin-top: 30px;
     font-size: 12px;
     color: #555;
+}
+
+/* =========================================================
+   UNIVERSAL RESPONSIVE FIX
+   LEVEL VR CLUB
+========================================================= */
+
+/* --- GLOBAL FIXES --- */
+
+html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    overflow-x: hidden;
+    min-height: 100svh;
+    width: 100%;
+}
+
+
+
+/* Картинки та відео */
+img,
+video,
+svg,
+canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Текст */
+h1, h2, h3, h4, h5, h6, p, span, a {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* =========================================================
+   FIX 100vh MOBILE BUG
+========================================================= */
+
+header,
+.hero-section,
+.main-section {
+    min-height: 100svh;
+}
+
+/* =========================================================
+   NAVBAR MOBILE
+========================================================= */
+
+@media (max-width: 992px) {
+
+    .navbar {
+        padding: 12px 16px;
+        backdrop-filter: blur(10px);
+        background: rgba(0,0,0,0.7);
+    }
+
+    .menu-toggle {
+        display: flex;
+    }
+
+    .menu {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        width: 280px;
+        height: 100svh;
+        background: rgba(0, 0, 0, 0.96);
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 24px;
+        transition: 0.4s ease;
+        padding: 40px 20px;
+        z-index: 9999;
+        clip-path: none;
+    }
+
+    .menu.active {
+        right: 0;
+    }
+
+    .menu a {
+        margin-right: 0;
+        font-size: 18px;
+        text-align: center;
+    }
+
+    .logo {
+        margin-left: 0;
+    }
+
+    .svg-logo {
+        height: 40px;
+    }
+
+    .cart-trigger {
+        margin-left: auto;
+        margin-right: 20px;
+    }
+}
+
+/* =========================================================
+   HERO SECTION MOBILE
+========================================================= */
+
+@media (max-width: 992px) {
+
+    header {
+        height: auto;
+        min-height: 100svh;
+        padding-top: 120px;
+        overflow: hidden;
+    }
+
+    .hero {
+        position: relative;
+        width: 100%;
+        height: auto;
+        left: 0;
+        bottom: 0;
+        margin: 0 auto;
+        object-fit: contain;
+    }
+
+    .secondbg {
+        width: 100%;
+        height: 100%;
+        clip-path: none;
+    }
+
+    .main-text {
+        margin: 0 auto;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .text-outline,
+    .text-solid {
+        font-size: clamp(42px, 12vw, 90px);
+        line-height: 1;
+    }
+
+    .text-blur {
+        font-size: clamp(60px, 18vw, 140px);
+        margin-bottom: -60px;
+    }
+
+    .sub-text {
+        font-size: 16px;
+        width: 100%;
+    }
+
+    .booking-btn {
+        width: 100%;
+        max-width: 320px;
+        font-size: 18px;
+        padding: 14px 20px;
+    }
+}
+
+/* =========================================================
+   SOCIAL + SIDE ELEMENTS
+========================================================= */
+
+@media (max-width: 992px) {
+
+    .made-by,
+    .made-by2,
+    .social-main {
+        display: none;
+    }
+}
+
+/* =========================================================
+   ABOUT SECTION
+========================================================= */
+
+@media (max-width: 768px) {
+
+    #about {
+        padding: 60px 20px;
+    }
+
+    .about-cards {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    #about .section-title {
+        font-size: 32px;
+    }
+
+    .about-card {
+        padding: 20px;
+    }
+}
+
+/* =========================================================
+   GAME CARDS
+========================================================= */
+
+@media (max-width: 768px) {
+
+    .psgames {
+        padding: 60px 20px;
+    }
+
+    .games-list {
+        gap: 16px;
+    }
+
+    .game-card {
+        width: calc(50% - 10px);
+    }
+
+    .game-card img {
+        height: 180px;
+    }
+
+    .game-card h3 {
+        font-size: 14px;
+    }
+
+    .game1 {
+        font-size: 32px;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .game-card {
+        width: 100%;
+        max-width: 320px;
+    }
+}
+
+/* =========================================================
+   PRICING CARDS
+========================================================= */
+
+@media (max-width: 768px) {
+
+    .pricing-cards {
+        padding: 20px;
+        gap: 24px;
+    }
+
+    .card-v2 {
+        width: 100%;
+        max-width: 360px;
+    }
+
+    .btn-add {
+        font-size: 16px;
+        padding: 16px;
+    }
+}
+
+/* =========================================================
+   CART MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+
+    .cart-sidebar {
+        width: 100%;
+        right: -100%;
+    }
+
+    .cart-sidebar.open {
+        right: 0;
+    }
+}
+
+/* =========================================================
+   FOOTER MOBILE
+========================================================= */
+
+@media (max-width: 992px) {
+
+    footer {
+        padding: 60px 20px;
+        height: auto;
+    }
+
+    .footer-text {
+        position: relative;
+        left: 0;
+        transform: none;
+        font-size: clamp(42px, 12vw, 80px);
+        margin-bottom: 40px;
+    }
+
+    .footer {
+        position: relative;
+        transform: none;
+        font-size: 16px;
+    }
+
+    .copyright {
+        position: relative;
+        bottom: auto;
+        right: auto;
+        margin-top: 40px;
+    }
+
+    .navigation {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .navigation a {
+        margin-right: 0;
+    }
+
+    .social {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .soc-text {
+        margin-right: 0;
+        width: auto;
+    }
+}
+
+/* =========================================================
+   SMALL DEVICES
+========================================================= */
+
+@media (max-width: 390px) {
+
+    .text-outline,
+    .text-solid {
+        font-size: 38px;
+    }
+
+    .text-blur {
+        font-size: 60px;
+    }
+
+    .booking-btn {
+        font-size: 16px;
+    }
+
+    .game-card img {
+        height: 160px;
+    }
+}
+
+/* =========================================================
+   IOS SAFARI FIXES
+========================================================= */
+
+body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* =========================================================
+   SMOOTH MOBILE PERFORMANCE
+========================================================= */
+
+.game-card,
+.about-card,
+.card-v2,
+.btn-add,
+.booking-btn {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* =========================================================
+   TOUCH FIXES
+========================================================= */
+
+button,
+a,
+.menu-toggle,
+.btn-add {
+    touch-action: manipulation;
+}
+
+/* =========================================================
+   PREVENT OVERFLOW BUGS
+========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+@media (max-width: 992px) {
+
+    .copyright {
+        position: relative !important;
+        width: 100% !important;
+        text-align: center !important;
+        margin-top: 20px !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+    }
+
+
+    .copyright span,
+    .copyright p {
+        display: block !important;
+        writing-mode: horizontal-tb !important;
+        transform: rotate(0deg) !important;
+        rotate: 0deg !important;
+        white-space: normal !important;
+        text-align: center !important;
+    }
+
 }
