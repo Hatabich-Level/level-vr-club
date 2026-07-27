@@ -1,3 +1,182 @@
+// =============================================
+// 🔔 КАСТОМНЕ СПОВІЩЕННЯ (замість браузерного alert)
+// =============================================
+function showNotification(message, type = 'info') {
+    // Видаляємо попереднє сповіщення якщо є
+    const existing = document.getElementById('cyber-notification');
+    if (existing) existing.remove();
+
+    const icons = {
+        info:    '◈',
+        success: '✓',
+        error:   '✕',
+        warning: '⚠',
+    };
+
+    const colors = {
+        info:    '#00F0FF',
+        success: '#00FF99',
+        error:   '#FF0055',
+        warning: '#FFD700',
+    };
+
+    const icon  = icons[type]  || icons.info;
+    const color = colors[type] || colors.info;
+
+    const el = document.createElement('div');
+    el.id = 'cyber-notification';
+    el.innerHTML = `
+        <div class="cn-icon" style="color:${color}">${icon}</div>
+        <div class="cn-text">${message}</div>
+        <div class="cn-close" onclick="this.parentElement.remove()">✕</div>
+    `;
+    el.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 99999;
+        background: #0a0a0a;
+        border: 1px solid ${color};
+        box-shadow: 0 0 20px ${color}55, 0 4px 30px rgba(0,0,0,0.8);
+        padding: 16px 20px;
+        max-width: 340px;
+        min-width: 260px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        font-family: 'Noto Sans', sans-serif;
+        clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+        animation: cnSlideIn 0.3s cubic-bezier(0.16,1,0.3,1);
+    `;
+
+    // Стилі для внутрішніх елементів
+    el.querySelector('.cn-icon').style.cssText = `
+        font-size: 22px;
+        line-height: 1;
+        flex-shrink: 0;
+        margin-top: 1px;
+        text-shadow: 0 0 10px ${color};
+    `;
+    el.querySelector('.cn-text').style.cssText = `
+        color: #eee;
+        font-size: 14px;
+        line-height: 1.5;
+        flex: 1;
+    `;
+    el.querySelector('.cn-close').style.cssText = `
+        color: #555;
+        cursor: pointer;
+        font-size: 14px;
+        flex-shrink: 0;
+        transition: color 0.2s;
+        padding: 0 0 0 4px;
+        line-height: 1;
+    `;
+    el.querySelector('.cn-close').onmouseenter = e => e.target.style.color = '#FF0055';
+    el.querySelector('.cn-close').onmouseleave = e => e.target.style.color = '#555';
+
+    // Додаємо CSS анімацію якщо ще немає
+    if (!document.getElementById('cn-style')) {
+        const style = document.createElement('style');
+        style.id = 'cn-style';
+        style.textContent = `
+            @keyframes cnSlideIn {
+                from { opacity:0; transform: translateX(40px); }
+                to   { opacity:1; transform: translateX(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(el);
+
+    // Автозакривання через 4 секунди
+    setTimeout(() => {
+        if (el.parentElement) {
+            el.style.transition = 'opacity 0.4s, transform 0.4s';
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(40px)';
+            setTimeout(() => el.remove(), 400);
+        }
+    }, 4000);
+}
+
+// Кастомний confirm (повертає Promise)
+function showConfirm(message) {
+    return new Promise(resolve => {
+        const existing = document.getElementById('cyber-confirm');
+        if (existing) existing.remove();
+
+        const el = document.createElement('div');
+        el.id = 'cyber-confirm';
+        el.innerHTML = `
+            <div class="cc-overlay"></div>
+            <div class="cc-box">
+                <div class="cc-icon">◈</div>
+                <div class="cc-msg">${message}</div>
+                <div class="cc-btns">
+                    <button class="cc-ok">ОК</button>
+                    <button class="cc-cancel">Скасувати</button>
+                </div>
+            </div>
+        `;
+
+        const overlay = el.querySelector('.cc-overlay');
+        const box     = el.querySelector('.cc-box');
+        const okBtn   = el.querySelector('.cc-ok');
+        const cancelBtn = el.querySelector('.cc-cancel');
+
+        overlay.style.cssText = `
+            position:fixed; inset:0; background:rgba(0,0,0,0.75);
+            backdrop-filter:blur(4px); z-index:99998;
+        `;
+        box.style.cssText = `
+            position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+            z-index:99999; background:#0a0a0a; border:1px solid #00F0FF;
+            box-shadow:0 0 30px #00F0FF44; padding:30px 28px;
+            max-width:360px; width:90%; text-align:center;
+            font-family:'Noto Sans',sans-serif;
+            clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px);
+            animation:cnSlideIn 0.25s ease;
+        `;
+        el.querySelector('.cc-icon').style.cssText = `
+            color:#00F0FF; font-size:28px; margin-bottom:12px;
+            text-shadow:0 0 12px #00F0FF;
+        `;
+        el.querySelector('.cc-msg').style.cssText = `
+            color:#eee; font-size:15px; line-height:1.6; margin-bottom:24px;
+        `;
+        el.querySelector('.cc-btns').style.cssText = `
+            display:flex; gap:12px; justify-content:center;
+        `;
+        okBtn.style.cssText = `
+            flex:1; padding:12px; background:#00F0FF; color:#000;
+            border:none; font-weight:900; text-transform:uppercase;
+            letter-spacing:1px; cursor:pointer; font-size:14px;
+            clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+            transition:background 0.2s;
+        `;
+        cancelBtn.style.cssText = `
+            flex:1; padding:12px; background:transparent; color:#888;
+            border:1px solid #333; font-weight:700; text-transform:uppercase;
+            letter-spacing:1px; cursor:pointer; font-size:14px;
+            clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+            transition:border-color 0.2s, color 0.2s;
+        `;
+
+        okBtn.onmouseenter = () => okBtn.style.background = '#fff';
+        okBtn.onmouseleave = () => okBtn.style.background = '#00F0FF';
+        cancelBtn.onmouseenter = () => { cancelBtn.style.borderColor='#FF0055'; cancelBtn.style.color='#FF0055'; };
+        cancelBtn.onmouseleave = () => { cancelBtn.style.borderColor='#333'; cancelBtn.style.color='#888'; };
+
+        okBtn.onclick     = () => { el.remove(); resolve(true);  };
+        cancelBtn.onclick = () => { el.remove(); resolve(false); };
+        overlay.onclick   = () => { el.remove(); resolve(false); };
+
+        document.body.appendChild(el);
+    });
+}
+
 let cart = [];
 let totalPrice = 0;
 let isSubmitting = false;
@@ -11,12 +190,15 @@ document.addEventListener("DOMContentLoaded", () => {
     menuToggle.addEventListener("click", () => {
       menu.classList.toggle("active");
       menuToggle.classList.toggle("active");
+      // Блокуємо скрол сторінки коли меню відкрите
+      document.body.style.overflow = menu.classList.contains("active") ? "hidden" : "";
     });
 
     menu.querySelectorAll("a").forEach(link => {
       link.addEventListener("click", () => {
         menu.classList.remove("active");
         menuToggle.classList.remove("active");
+        document.body.style.overflow = "";
       });
     });
 
@@ -166,7 +348,7 @@ document.querySelectorAll(".card-v2").forEach(card => {
 // === Відкрити модальне вікно ===
 function openModal() {
   if (cart.length === 0) {
-    alert("Корзина порожня. Додайте товари перед бронюванням!");
+    showNotification("Корзина порожня. Додайте товари перед бронюванням!", "warning");
     return;
   }
   const modal = document.getElementById("dateTimeModal");
@@ -210,12 +392,12 @@ async function submitOrder() {
   const comment = document.getElementById("comment")?.value || "Немає";
 
   if (!date || !time) {
-    alert("Будь ласка, оберіть дату та час!");
+    showNotification("Будь ласка, оберіть дату та час!", "warning"); return;
     return;
   }
 
   if (cart.length === 0) {
-    alert("Корзина порожня!");
+    showNotification("Корзина порожня!", "warning"); return;
     return;
   }
 
@@ -251,7 +433,8 @@ const data = await response.json();
       const botUsername = "priwetabot"; 
       const orderId = data.orderId;
 
-      const userWantsBot = confirm(`✅ Бронювання #${orderId} успішно створено!\n\nНатисніть "ОК", щоб перейти в нашого Telegram-бота та отримати квиток із підтвердженням.`);
+      showNotification(`✅ Бронювання #${orderId} успішно створено!`, "success");
+      const userWantsBot = await showConfirm(`Перейти до Telegram-бота та отримати квиток із підтвердженням?`);
       
       if (userWantsBot) {
          // Перекидаємо клієнта в бота з його унікальним номером замовлення
@@ -267,7 +450,7 @@ const data = await response.json();
 
   } catch (error) {
     console.error("❌ Помилка відправки:", error);
-    alert(`Помилка: ${error.message}. Перевір, чи працює сервер!`);
+    showNotification(`Помилка: ${error.message}`, "error");
   } finally {
     isSubmitting = false;
     if(submitBtn) submitBtn.innerText = "ПІДТВЕРДИТИ";
