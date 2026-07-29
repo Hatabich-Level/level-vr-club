@@ -1,4 +1,55 @@
 // =============================================
+// 💰 ЄДИНЕ ДЖЕРЕЛО ЦІН — редагуй тільки тут!
+// Ці ціни автоматично використовуються на головній
+// сторінці (картки тарифів) і в калькуляторі бронювання
+// дня народження, щоб не було розсинхрону.
+// =============================================
+const CLUB_PRICES = {
+    ps5: { one: 100, two: 150 }, // PlayStation 5 PRO, грн/год (1 / 2 гравці)
+    vip: 200,                    // VIP кімната (PS5 + VR), грн/год за кімнату
+    psvr2: 150,                  // PS VR2, грн/год з особи
+    oculus: 150,                 // Oculus 2, грн/год з особи
+    vr: 150                      // Загальна ціна VR-окулярів з особи (калькулятор ДН)
+};
+
+// =============================================
+// 🕒 СТАТУС РОБОТИ КЛУБУ (щодня 10:00–22:00, Київський час)
+// =============================================
+const WORK_HOURS = { openHour: 10, closeHour: 22 }; // без вихідних
+
+function updateWorkStatus() {
+    const badge = document.getElementById('workStatusBadge');
+    if (!badge) return;
+
+    const textEl = badge.querySelector('.work-status-text');
+
+    // Беремо точний поточний час у Києві незалежно від таймзони відвідувача
+    const kyivParts = new Intl.DateTimeFormat('uk-UA', {
+        timeZone: 'Europe/Kyiv',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).formatToParts(new Date());
+
+    const hour = parseInt(kyivParts.find(p => p.type === 'hour').value, 10);
+    const minute = parseInt(kyivParts.find(p => p.type === 'minute').value, 10);
+
+    const isOpen = hour >= WORK_HOURS.openHour && hour < WORK_HOURS.closeHour;
+
+    badge.classList.toggle('open', isOpen);
+    badge.classList.toggle('closed', !isOpen);
+
+    if (isOpen) {
+        textEl.textContent = `Працюємо до ${WORK_HOURS.closeHour}:00`;
+    } else {
+        textEl.textContent = `Зачинено · з ${WORK_HOURS.openHour}:00`;
+    }
+}
+
+updateWorkStatus();
+setInterval(updateWorkStatus, 60 * 1000); // оновлюємо щохвилини
+
+// =============================================
 // 🔔 КАСТОМНЕ СПОВІЩЕННЯ (замість браузерного alert)
 // =============================================
 function showNotification(message, type = 'info') {
@@ -239,6 +290,28 @@ function getRandomEmptyMessage() {
 }
 
 // === Оновлення відображення кошика ===
+// Чи є в кошику товар, повʼязаний з VR (потребує підтвердження віку)
+function cartHasVr() {
+    const vrKeywords = ["VR", "VIP", "Oculus"];
+    return cart.some(item =>
+        vrKeywords.some(keyword => item.device.toLowerCase().includes(keyword.toLowerCase()))
+    );
+}
+
+// Показує/ховає блок підтвердження віку (10+) залежно від вмісту кошика
+function updateAgeConfirmVisibility() {
+    const block = document.getElementById("age-confirm-block");
+    if (!block) return;
+
+    if (cartHasVr()) {
+        block.classList.remove("hidden");
+    } else {
+        block.classList.add("hidden");
+        const checkbox = document.getElementById("age-confirm-checkbox");
+        if (checkbox) checkbox.checked = false; // скидаємо, щоб не залишалось "зайве" підтвердження
+    }
+}
+
 function renderCart() {
     const container = document.getElementById('cart-items-container');
     const totalEl = document.getElementById('cart-total-price');
@@ -252,9 +325,10 @@ function renderCart() {
     if (cart.length === 0) {
         const message = getRandomEmptyMessage();
         container.innerHTML = `<p class="empty-msg">${message}</p>`;
-        if(countEl) countEl.innerText = '0';
+        if(countEl) { countEl.innerText = '0'; countEl.style.display = 'none'; }
         if(totalEl) totalEl.innerText = '0 грн';
         if(bookingTotal) bookingTotal.innerText = '0';
+        updateAgeConfirmVisibility();
         return;
     }
 
@@ -275,8 +349,10 @@ function renderCart() {
     });
 
     if(totalEl) totalEl.innerText = totalPrice + ' грн';
-    if(countEl) countEl.innerText = cart.length;
+    if(countEl) { countEl.innerText = cart.length; countEl.style.display = ''; }
     if(bookingTotal) bookingTotal.innerText = totalPrice; 
+
+    updateAgeConfirmVisibility();
 }
 
 // === Додавання товару ===
@@ -306,8 +382,33 @@ document.querySelectorAll(".card-v2").forEach(card => {
   const priceSpan = card.querySelector(".price-display span");
   if (!priceSpan) return; 
 
-  const baseOne = +priceSpan.dataset.one || 0;
-  const baseTwo = +priceSpan.dataset.two || baseOne; 
+  // Беремо "справжню" ціну з єдиного джерела CLUB_PRICES за id картки.
+  // Якщо картки немає в CLUB_PRICES (напр. нова картка) — використовуємо
+  // data-one / data-two як запасний варіант.
+  let baseOne, baseTwo;
+  switch (card.id) {
+    case 'ps5-card':
+      baseOne = CLUB_PRICES.ps5.one;
+      baseTwo = CLUB_PRICES.ps5.two;
+      break;
+    case 'vip-card':
+      baseOne = CLUB_PRICES.vip;
+      baseTwo = CLUB_PRICES.vip;
+      break;
+    case 'psvr-card':
+      baseOne = CLUB_PRICES.psvr2;
+      baseTwo = CLUB_PRICES.psvr2;
+      break;
+    case 'oculus-card':
+      baseOne = CLUB_PRICES.oculus;
+      baseTwo = CLUB_PRICES.oculus;
+      break;
+    default:
+      baseOne = +priceSpan.dataset.one || 0;
+      baseTwo = +priceSpan.dataset.two || baseOne;
+  }
+
+  priceSpan.innerText = baseOne;
 
   let hours = 1;
   let players = 1;
@@ -358,6 +459,7 @@ function openModal() {
     modal.style.display = "flex";
     document.body.style.overflow = "hidden"; 
     if(particles) particles.style.display = "none"; 
+    updateAgeConfirmVisibility();
   }
 }
 
@@ -398,6 +500,18 @@ async function submitOrder() {
 
   if (cart.length === 0) {
     showNotification("Корзина порожня!", "warning"); return;
+    return;
+  }
+
+  // Перевірка підтвердження віку (10+) для товарів з VR
+  const vrKeywords = ["VR", "VIP", "Oculus"];
+  const hasVrItem = cart.some(item =>
+    vrKeywords.some(keyword => item.device.toLowerCase().includes(keyword.toLowerCase()))
+  );
+  const ageCheckbox = document.getElementById("age-confirm-checkbox");
+
+  if (hasVrItem && ageCheckbox && !ageCheckbox.checked) {
+    showNotification("Будь ласка, підтвердіть, що всім гравцям VR є 10 років або більше!", "warning");
     return;
   }
 

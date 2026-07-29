@@ -2848,6 +2848,355 @@ html, body {
     color: #ccc;
 }
 
+/* =========================================================
+   КАЛЬКУЛЯТОР ВАРТОСТІ ДНЯ НАРОДЖЕННЯ
+========================================================= */
+.calc-wrapper {
+    width: 100%;
+    max-width: 620px;
+    margin: 10px auto 40px;
+    background: rgba(5, 5, 5, 0.85);
+    border: 2px solid var(--cyber-cyan, #00F0FF);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+    padding: 30px 25px;
+    font-family: 'KogniGear', sans-serif;
+    clip-path: polygon(
+        20px 0, 100% 0,
+        100% calc(100% - 20px), calc(100% - 20px) 100%,
+        0 100%, 0 20px
+    );
+}
+
+.calc-title {
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 1.4rem;
+    text-align: center;
+    margin-bottom: 25px;
+    text-shadow: 0 0 5px var(--cyber-cyan, #00F0FF);
+}
+
+.calc-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.calc-row label {
+    color: #00F0FF;
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.calc-guests-input {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+}
+
+.calc-guests-input button {
+    background: transparent;
+    border: 1px solid #00F0FF;
+    color: #00F0FF;
+    width: 44px;
+    font-size: 1.3rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.calc-guests-input button:hover {
+    background: #00F0FF;
+    color: #000;
+}
+
+.calc-guests-input input {
+    flex: 1;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #333;
+    border-left: none;
+    border-right: none;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    outline: none;
+    -moz-appearance: textfield;
+}
+
+.calc-guests-input input::-webkit-outer-spin-button,
+.calc-guests-input input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.calc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.calc-chip {
+    background: transparent;
+    border: 1px solid #fff;
+    color: #fff;
+    padding: 10px 16px;
+    text-align: center;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    transition: 0.3s;
+    flex: 1;
+    min-width: 70px;
+}
+
+.calc-chip:hover {
+    border-color: var(--cyber-cyan, #00F0FF);
+    color: var(--cyber-cyan, #00F0FF);
+}
+
+.calc-chip.active {
+    background: #fff;
+    color: #000;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.calc-chip.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Питання про вік */
+.calc-age-question {
+    border: 1px dashed rgba(0, 240, 255, 0.4);
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.calc-age-question p {
+    color: #eee;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.calc-age-btns {
+    display: flex;
+    gap: 10px;
+}
+
+.calc-age-btns button {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid #555;
+    color: #ccc;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.calc-age-btns button:hover {
+    border-color: var(--cyber-cyan, #00F0FF);
+    color: var(--cyber-cyan, #00F0FF);
+}
+
+.calc-age-btns button.active-yes {
+    background: #00F0FF;
+    border-color: #00F0FF;
+    color: #000;
+    font-weight: bold;
+}
+
+.calc-age-btns button.active-no {
+    background: #FF0055;
+    border-color: #FF0055;
+    color: #fff;
+    font-weight: bold;
+}
+
+.calc-age-warning {
+    display: none;
+    font-family: 'Noto Sans', sans-serif;
+    color: #FFD700;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-top: 12px;
+    border-left: 3px solid #FFD700;
+    padding-left: 10px;
+}
+
+.calc-age-warning.show {
+    display: block;
+}
+
+.calc-total {
+    color: var(--cyber-cyan, #00F0FF);
+    font-size: 1.6rem;
+    font-weight: bold;
+    text-align: center;
+    text-shadow: 0 0 10px var(--cyber-cyan, #00F0FF);
+    border-top: 1px solid rgba(0, 240, 255, 0.3);
+    padding-top: 18px;
+    margin-bottom: 22px;
+}
+
+.calc-breakdown-lines {
+    margin-bottom: 10px;
+}
+
+.calc-breakdown-line {
+    display: flex;
+    justify-content: space-between;
+    color: #ccc;
+    font-size: 0.85rem;
+    font-weight: normal;
+    text-shadow: none;
+    padding: 4px 0;
+}
+
+.calc-total span {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    text-shadow: none;
+    font-weight: normal;
+}
+
+/* Чекбокс підтвердження віку у формі бронювання (index.html) */
+.age-confirm {
+    display: grid !important;
+    grid-template-columns: 18px 1fr !important;
+    align-items: start !important;
+    gap: 10px !important;
+    margin-bottom: 20px;
+    padding: 12px;
+    border: 1px dashed rgba(0, 240, 255, 0.4);
+    text-align: left !important;
+    writing-mode: horizontal-tb !important;
+}
+
+.age-confirm input[type="checkbox"] {
+    grid-column: 1 !important;
+    width: 18px !important;
+    height: 18px !important;
+    margin: 2px 0 0 0 !important;
+    accent-color: #00F0FF;
+    cursor: pointer;
+}
+
+.age-confirm label {
+    grid-column: 2 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    color: #ccc;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    text-align: left !important;
+    white-space: normal !important;
+    cursor: pointer;
+}
+
+/* Показуємо блок підтвердження віку тільки коли в кошику є VR-товар */
+.age-confirm.hidden {
+    display: none !important;
+}
+
+/* Бейдж "Працюємо / Зачинено" в навбарі */
+.work-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 20px;
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    color: #eee;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.work-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #666;
+}
+
+.work-status.open .work-status-dot {
+    background: #00ff88;
+    box-shadow: 0 0 6px #00ff88;
+}
+
+.work-status.closed .work-status-dot {
+    background: #ff0055;
+    box-shadow: 0 0 6px #ff0055;
+}
+
+.work-status.open .work-status-text {
+    color: #00ff88;
+}
+
+.work-status.closed .work-status-text {
+    color: #ff6688;
+}
+
+@media (max-width: 992px) {
+    .work-status {
+        font-size: 0.7rem;
+        padding: 5px 10px;
+        gap: 6px;
+    }
+}
+
+/* Кнопка "Зв'язатися з нами" в калькуляторі дня народження */
+.contact-button {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 15px;
+    margin-top: 5px;
+    background: #00F0FF;
+    color: #000;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: 0.3s;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+.contact-button:hover {
+    background: #fff;
+    box-shadow: 0 0 15px #00F0FF;
+    color: #000;
+}
+
+@media (max-width: 500px) {
+    .calc-wrapper { padding: 22px 16px; }
+    .calc-chips { flex-wrap: wrap; }
+}
+
 .copyright {
     margin-top: 30px;
     font-size: 12px;
@@ -3293,11 +3642,15 @@ html {
     overflow-x: hidden;
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    background-color: #000;
 }
 
 body {
     overflow-x: hidden;
     width: 100%;
+    background-color: #000;
+    position: relative; /* створює stacking context, щоб #particles-js (z-index:-1) знову малювався над фоном html */
+    z-index: 0;
 }
 
 img, video, svg {
