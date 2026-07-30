@@ -588,6 +588,43 @@
 
         .admin-close:hover { color: #fff; }
 
+        .admin-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .admin-tab {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #666;
+            padding: 10px 6px;
+            font-family: 'Noto Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .admin-tab:hover { color: #ccc; }
+
+        .admin-tab.active {
+            color: #00F0FF;
+            border-bottom-color: #00F0FF;
+        }
+
+        .admin-btn.danger {
+            border-color: #ff5c5c;
+            color: #ff5c5c;
+            background: rgba(255,60,60,0.08);
+        }
+
+        .admin-btn.danger:hover { background: rgba(255,60,60,0.18); }
+
         .admin-results {
             margin-top: 18px;
             display: flex;
@@ -739,22 +776,39 @@
     <div class="admin-modal-overlay" id="admin-modal-overlay">
         <div class="admin-modal">
             <button class="admin-close" id="admin-close">Закрити ✕</button>
-            <h3>Додати гру через сайт</h3>
+            <h3>Керування каталогом</h3>
 
             <div class="admin-field">
                 <label>Ключ доступу</label>
                 <input type="password" id="admin-key" placeholder="Секретний ключ адміністратора" autocomplete="off">
             </div>
 
-            <div class="admin-row">
-                <div class="admin-field">
-                    <label>Назва гри</label>
-                    <input type="text" id="admin-query" placeholder="Наприклад: UFC 5" autocomplete="off">
-                </div>
-                <button class="admin-btn" id="admin-search-btn" style="align-self:flex-end; margin-bottom:14px;">Знайти</button>
+            <div class="admin-tabs">
+                <button class="admin-tab active" id="tab-add-btn">+ Додати гру</button>
+                <button class="admin-tab" id="tab-delete-btn">🗑 Видалити гру</button>
             </div>
 
-            <div class="admin-results" id="admin-results"></div>
+            <!-- ДОДАВАННЯ -->
+            <div id="panel-add">
+                <div class="admin-row">
+                    <div class="admin-field">
+                        <label>Назва гри</label>
+                        <input type="text" id="admin-query" placeholder="Наприклад: UFC 5" autocomplete="off">
+                    </div>
+                    <button class="admin-btn" id="admin-search-btn" style="align-self:flex-end; margin-bottom:14px;">Знайти</button>
+                </div>
+                <div class="admin-results" id="admin-results"></div>
+            </div>
+
+            <!-- ВИДАЛЕННЯ -->
+            <div id="panel-delete" style="display:none;">
+                <div class="admin-field">
+                    <label>Пошук у каталозі</label>
+                    <input type="text" id="admin-delete-query" placeholder="Почніть вводити назву гри..." autocomplete="off">
+                </div>
+                <div class="admin-results" id="admin-delete-results"></div>
+            </div>
+
             <div class="admin-msg" id="admin-msg"></div>
         </div>
     </div>
@@ -1073,6 +1127,101 @@
         adminQueryInput.addEventListener('keydown', e => {
             if (e.key === 'Enter') searchGamesFromSite();
         });
+
+        /* ===== ВКЛАДКИ: ДОДАТИ / ВИДАЛИТИ ===== */
+        const tabAddBtn = document.getElementById('tab-add-btn');
+        const tabDeleteBtn = document.getElementById('tab-delete-btn');
+        const panelAdd = document.getElementById('panel-add');
+        const panelDelete = document.getElementById('panel-delete');
+        const deleteQueryInput = document.getElementById('admin-delete-query');
+        const deleteResults = document.getElementById('admin-delete-results');
+
+        tabAddBtn.addEventListener('click', () => {
+            tabAddBtn.classList.add('active');
+            tabDeleteBtn.classList.remove('active');
+            panelAdd.style.display = 'block';
+            panelDelete.style.display = 'none';
+            adminMsg.className = 'admin-msg';
+        });
+
+        tabDeleteBtn.addEventListener('click', () => {
+            tabDeleteBtn.classList.add('active');
+            tabAddBtn.classList.remove('active');
+            panelDelete.style.display = 'block';
+            panelAdd.style.display = 'none';
+            adminMsg.className = 'admin-msg';
+            renderDeleteResults();
+        });
+
+        function renderDeleteResults() {
+            const q = deleteQueryInput.value.toLowerCase().trim();
+            const matches = (q
+                ? allGames.filter(g => g.title.toLowerCase().includes(q))
+                : allGames
+            ).slice(0, 30);
+
+            if (!matches.length) {
+                deleteResults.innerHTML = `<p style="color:#555; font-size:13px;">Нічого не знайдено в каталозі.</p>`;
+                return;
+            }
+
+            deleteResults.innerHTML = matches.map(g => `
+                <div class="admin-result-card" data-id="${g.id}">
+                    <img src="${g.image_url || 'images/placeholder.jpg'}" alt="${g.title}" onerror="this.src='images/placeholder.jpg'">
+                    <div class="admin-result-info">
+                        <div class="title">${g.title}</div>
+                        <div class="plat">${g.platform || ''}</div>
+                    </div>
+                    <div class="admin-result-actions">
+                        <button class="admin-btn danger" data-delete-id="${g.id}">Видалити</button>
+                    </div>
+                </div>
+            `).join('');
+
+            deleteResults.querySelectorAll('[data-delete-id]').forEach(btn => {
+                btn.addEventListener('click', () => deleteGameFromSite(Number(btn.dataset.deleteId), btn));
+            });
+        }
+
+        deleteQueryInput.addEventListener('input', renderDeleteResults);
+
+        async function deleteGameFromSite(id, btnEl) {
+            const key = adminKeyInput.value.trim();
+            if (!key) return showAdminMsg('Введіть ключ доступу', 'err');
+
+            const game = allGames.find(g => g.id === id);
+            const title = game ? game.title : `#${id}`;
+
+            if (!confirm(`Видалити «${title}» з каталогу? Дію не можна скасувати.`)) return;
+
+            btnEl.disabled = true;
+            btnEl.textContent = 'Видаляємо...';
+
+            try {
+                const res = await fetch('/api/games/delete-site', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, id })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showAdminMsg(data.error || 'Помилка видалення', 'err');
+                    btnEl.disabled = false;
+                    btnEl.textContent = 'Видалити';
+                    return;
+                }
+
+                allGames = allGames.filter(g => g.id !== id);
+                renderGames();
+                renderDeleteResults();
+                showAdminMsg(`«${title}» видалено з каталогу.`, 'ok');
+            } catch (err) {
+                showAdminMsg('Помилка з\'єднання із сервером', 'err');
+                btnEl.disabled = false;
+                btnEl.textContent = 'Видалити';
+            }
+        }
 
         window.onload = loadGames;
     </script>

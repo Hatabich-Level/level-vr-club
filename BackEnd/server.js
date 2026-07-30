@@ -198,14 +198,78 @@ app.post('/api/book', async (req, res) => {
 /* ================= CANCEL FLOW ================= */
 const cancelReasons = {};
 
+/* ================= ОЧІКУВАННЯ ПІДТВЕРДЖЕННЯ ГРИ (Telegram) ================= */
+const pendingGameAdds = {};
+
+function escapeIgdbQuery(str) {
+  return String(str).replace(/"/g, '\\"');
+}
+
+// Оцінюємо наскільки назва гри з IGDB відповідає введеному запиту.
+// Менше значення = кращий збіг.
+function scoreGameMatch(name, query) {
+  const n = (name || '').toLowerCase().trim();
+  const q = (query || '').toLowerCase().trim();
+  if (!n || !q) return 99;
+  if (n === q) return 0;
+  if (n.startsWith(q)) return 1;
+  if (n.includes(q)) return 2;
+
+  const qTokens = q.split(/\s+/).filter(Boolean);
+  const overlap = qTokens.filter(t => n.includes(t)).length;
+  return 10 - overlap;
+}
+
+function sortGamesByRelevance(list, query, nameField = 'name') {
+  return [...list].sort(
+    (a, b) => scoreGameMatch(a[nameField], query) - scoreGameMatch(b[nameField], query)
+  );
+}
+
 /* ================= CALLBACK ================= */
 bot.on('callback_query', async (query) => {
   const action = query.data; // ВАЖЛИВО: Оголошуємо action!
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
-  const orderId = action.split('_')[1];
 
   try {
+    if (action === 'gameadd_yes') {
+      const pending = pendingGameAdds[chatId];
+      if (!pending) {
+        await bot.answerCallbackQuery(query.id, { text: 'Немає активної гри для додавання' });
+        return;
+      }
+
+      const alreadyExists = await gameExistsByTitle(pending.title);
+      if (alreadyExists) {
+        await bot.editMessageCaption(`⚠️ Гра "${pending.title}" вже є в каталозі. Пропущено.`, {
+          chat_id: chatId, message_id: messageId
+        });
+      } else {
+        await pool.query(
+          'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4)',
+          [pending.title, pending.platform, pending.description, pending.image_url]
+        );
+        await bot.editMessageCaption(`✅ Гру "${pending.title}" додано на сайт!`, {
+          chat_id: chatId, message_id: messageId
+        });
+      }
+      delete pendingGameAdds[chatId];
+      await bot.answerCallbackQuery(query.id);
+      return;
+    }
+
+    if (action === 'gameadd_no') {
+      delete pendingGameAdds[chatId];
+      await bot.editMessageCaption('❌ Додавання гри скасовано. Спробуйте ввести точнішу назву.', {
+        chat_id: chatId, message_id: messageId
+      });
+      await bot.answerCallbackQuery(query.id);
+      return;
+    }
+
+    const orderId = action.split('_')[1];
+
     if (action.startsWith('confirm_')) {
       const res = await pool.query('SELECT client_chat_id, booking_time FROM bookings WHERE id = $1', [orderId]);
       
@@ -367,14 +431,17 @@ bot.on('message', async (msg) => {
                     'Client-ID': TWITCH_CLIENT_ID,
                     'Authorization': `Bearer ${token}`
                 },
-                data: `search "${gameName}"; fields name, summary, platforms.name, cover.url; limit 1;`
+                data: `search "${escapeIgdbQuery(gameName)}"; fields name, summary, platforms.name, cover.url; limit 10;`
             });
 
             if (response.data.length === 0) {
                 return bot.sendMessage(chatId, "❌ Гру не знайдено. Спробуйте точнішу назву англійською.");
             }
 
-            const game = response.data[0];
+            // Сортуємо результати за релевантністю до введеної назви,
+            // щоб не брати випадковий перший варіант з IGDB (звідси й був баг з чужими іграми)
+            const sorted = sortGamesByRelevance(response.data, gameName, 'name');
+            const game = sorted[0];
 
             // ЗАХИСТ ВІД ДУБЛІКАТІВ
             const alreadyExists = await gameExistsByTitle(game.name);
@@ -396,14 +463,25 @@ bot.on('message', async (msg) => {
             else if (platforms.includes('PC')) mainPlatform = 'PC';
             else if (platforms.includes('VR')) mainPlatform = 'VR';
 
-            await pool.query(
-                'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4)',
-                [game.name, mainPlatform, description.substring(0, 500) + '...', imageUrl]
-            );
+            // Зберігаємо гру як "очікує підтвердження" — НЕ вставляємо в базу одразу
+            pendingGameAdds[chatId] = {
+                title: game.name,
+                platform: mainPlatform,
+                description: description.substring(0, 500) + '...',
+                image_url: imageUrl
+            };
 
             bot.sendPhoto(chatId, imageUrl, {
-                caption: `✅ <b>Гру автоматично додано!</b>\n\n🎮 <b>Назва:</b> ${game.name}\n🕹 <b>Платформи:</b> ${platforms}\n\n<i>Вона вже з'явилася на сайті.</i>`,
-                parse_mode: 'HTML'
+                caption: `❓ <b>Це та гра?</b>\n\n🎮 <b>Назва:</b> ${game.name}\n🕹 <b>Платформи:</b> ${platforms}\n\n<i>Перевірте назву — якщо це не та гра, натисніть "Ні" і спробуйте ввести точнішу назву (бажано англійською).</i>`,
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '✅ Так, додати', callback_data: 'gameadd_yes' },
+                            { text: '❌ Ні, скасувати', callback_data: 'gameadd_no' }
+                        ]
+                    ]
+                }
             });
 
         } catch (err) {
@@ -456,10 +534,12 @@ app.post('/api/games/search-site', async (req, res) => {
         'Client-ID': TWITCH_CLIENT_ID,
         'Authorization': `Bearer ${token}`
       },
-      data: `search "${query}"; fields name, summary, platforms.name, cover.url; limit 6;`
+      data: `search "${escapeIgdbQuery(query)}"; fields name, summary, platforms.name, cover.url; limit 8;`
     });
 
-    const results = await Promise.all(response.data.map(async (game) => {
+    const sortedData = sortGamesByRelevance(response.data, query, 'name');
+
+    const results = await Promise.all(sortedData.map(async (game) => {
       let imageUrl = "https://via.placeholder.com/500x700?text=No+Image";
       if (game.cover && game.cover.url) {
         imageUrl = 'https:' + game.cover.url.replace('t_thumb', 't_1080p');
@@ -521,5 +601,32 @@ app.post('/api/games/add-site', async (req, res) => {
   } catch (err) {
     console.error('Помилка додавання гри (сайт):', err.message);
     res.status(500).json({ error: 'Помилка додавання гри' });
+  }
+});
+
+// Видалення гри з каталогу через сайт
+app.post('/api/games/delete-site', async (req, res) => {
+  if (!checkSiteKey(req, res)) return;
+
+  const id = req.body.id;
+  if (!id) {
+    return res.status(400).json({ error: 'Немає id гри' });
+  }
+
+  try {
+    const result = await pool.query('DELETE FROM games WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Гру не знайдено' });
+    }
+
+    if (ADMIN_CHAT_ID) {
+      bot.sendMessage(ADMIN_CHAT_ID, `🗑 Гру "${result.rows[0].title}" видалено через сайт.`);
+    }
+
+    res.json({ success: true, game: result.rows[0] });
+  } catch (err) {
+    console.error('Помилка видалення гри (сайт):', err.message);
+    res.status(500).json({ error: 'Помилка видалення гри' });
   }
 });
