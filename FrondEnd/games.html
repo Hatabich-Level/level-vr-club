@@ -429,6 +429,228 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ===== КНОПКА "ПОКАЗАТИ ЩЕ" ===== */
+        .load-more-wrap {
+            display: flex;
+            justify-content: center;
+            padding: 10px 20px 50px;
+        }
+
+        .load-more-btn {
+            background: rgba(0,240,255,0.06);
+            border: 1px solid rgba(0,240,255,0.4);
+            color: #00F0FF;
+            padding: 14px 36px;
+            font-family: 'Noto Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            cursor: pointer;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            transition: all 0.2s;
+        }
+
+        .load-more-btn:hover {
+            background: rgba(0,240,255,0.15);
+            box-shadow: 0 0 20px rgba(0,240,255,0.2);
+        }
+
+        /* ===== АДМІН: ДОДАВАННЯ ГРИ ЧЕРЕЗ САЙТ ===== */
+        .admin-fab {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            width: 52px;
+            height: 52px;
+            background: rgba(0,0,0,0.85);
+            border: 1px solid rgba(0,240,255,0.4);
+            color: #00F0FF;
+            font-size: 24px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 50;
+            opacity: 0;
+            transform: scale(0.7);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            transition: all 0.2s;
+        }
+
+        .admin-fab:hover {
+            box-shadow: 0 0 20px rgba(0,240,255,0.3);
+        }
+
+        .admin-fab.visible {
+            display: flex;
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .admin-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            z-index: 100;
+            padding: 60px 16px;
+            overflow-y: auto;
+        }
+
+        .admin-modal-overlay.open { display: flex; }
+
+        .admin-modal {
+            background: #0a0a0a;
+            border: 1px solid rgba(0,240,255,0.3);
+            width: 100%;
+            max-width: 560px;
+            padding: 28px;
+            clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+        }
+
+        .admin-modal h3 {
+            margin: 0 0 20px;
+            font-size: 18px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        .admin-field {
+            margin-bottom: 14px;
+        }
+
+        .admin-field label {
+            display: block;
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 6px;
+        }
+
+        .admin-field input {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            padding: 10px 14px;
+            font-family: 'Noto Sans', sans-serif;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .admin-field input:focus {
+            border-color: #00F0FF;
+        }
+
+        .admin-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .admin-row .admin-field { flex: 1; }
+
+        .admin-btn {
+            background: rgba(0,240,255,0.1);
+            border: 1px solid #00F0FF;
+            color: #00F0FF;
+            padding: 11px 20px;
+            font-family: 'Noto Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .admin-btn:hover { background: rgba(0,240,255,0.2); }
+        .admin-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .admin-close {
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            float: right;
+        }
+
+        .admin-close:hover { color: #fff; }
+
+        .admin-results {
+            margin-top: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .admin-result-card {
+            display: flex;
+            gap: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 10px;
+        }
+
+        .admin-result-card img {
+            width: 54px;
+            height: 72px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .admin-result-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .admin-result-info .title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .admin-result-info .plat {
+            font-size: 11px;
+            color: #00F0FF;
+            margin-bottom: 6px;
+        }
+
+        .admin-result-actions {
+            display: flex;
+            align-items: center;
+        }
+
+        .admin-msg {
+            margin-top: 14px;
+            font-size: 12px;
+            letter-spacing: 1px;
+            padding: 10px 12px;
+            display: none;
+        }
+
+        .admin-msg.show { display: block; }
+        .admin-msg.ok { background: rgba(0,255,120,0.08); border: 1px solid rgba(0,255,120,0.3); color: #4dffb0; }
+        .admin-msg.err { background: rgba(255,60,60,0.08); border: 1px solid rgba(255,60,60,0.3); color: #ff8080; }
+        .admin-msg.exists { background: rgba(255,180,0,0.08); border: 1px solid rgba(255,180,0,0.3); color: #ffcf6b; }
+
+        @media (max-width: 480px) {
+            .admin-row { flex-direction: column; }
+        }
     </style>
 </head>
 <body>
@@ -504,7 +726,38 @@
                 <p style="margin-top:20px; font-size:12px; letter-spacing:3px;">Завантаження каталогу</p>
             </div>
         </div>
+
+        <!-- ПОКАЗАТИ ЩЕ -->
+        <div class="load-more-wrap" id="load-more-wrap" style="display:none;">
+            <button class="load-more-btn" id="load-more-btn">Показати ще</button>
+        </div>
     </main>
+
+    <!-- КНОПКА ДОДАВАННЯ ГРИ ЧЕРЕЗ САЙТ (без Telegram) -->
+    <div class="admin-fab" id="admin-fab" title="Додати гру">+</div>
+
+    <div class="admin-modal-overlay" id="admin-modal-overlay">
+        <div class="admin-modal">
+            <button class="admin-close" id="admin-close">Закрити ✕</button>
+            <h3>Додати гру через сайт</h3>
+
+            <div class="admin-field">
+                <label>Ключ доступу</label>
+                <input type="password" id="admin-key" placeholder="Секретний ключ адміністратора" autocomplete="off">
+            </div>
+
+            <div class="admin-row">
+                <div class="admin-field">
+                    <label>Назва гри</label>
+                    <input type="text" id="admin-query" placeholder="Наприклад: UFC 5" autocomplete="off">
+                </div>
+                <button class="admin-btn" id="admin-search-btn" style="align-self:flex-end; margin-bottom:14px;">Знайти</button>
+            </div>
+
+            <div class="admin-results" id="admin-results"></div>
+            <div class="admin-msg" id="admin-msg"></div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <div id="particles-js"></div>
@@ -517,6 +770,9 @@
         let allGames = [];
         let currentPlatform = 'all';
         let currentSearch = '';
+
+        const PAGE_SIZE = 10;
+        let visibleCount = PAGE_SIZE;
 
         async function loadGames() {
             try {
@@ -554,6 +810,7 @@
 
         function setFilter(platform) {
             currentPlatform = platform;
+            visibleCount = PAGE_SIZE;
             document.querySelectorAll('.filter-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.platform === platform);
             });
@@ -579,15 +836,20 @@
 
             totalEl.textContent = filtered.length;
 
+            const loadMoreWrap = document.getElementById('load-more-wrap');
+
             if (filtered.length === 0) {
                 container.innerHTML = `
                     <div class="empty-catalog">
                         <p>Нічого не знайдено</p>
                     </div>`;
+                loadMoreWrap.style.display = 'none';
                 return;
             }
 
-            container.innerHTML = filtered.map((game, i) => `
+            const visible = filtered.slice(0, visibleCount);
+
+            container.innerHTML = visible.map((game, i) => `
                 <div class="game-card" style="animation-delay:${i * 0.06}s">
                     <div class="game-poster">
                         <img
@@ -608,7 +870,18 @@
                     </div>
                 </div>
             `).join('');
+
+            if (filtered.length > visibleCount) {
+                loadMoreWrap.style.display = 'flex';
+            } else {
+                loadMoreWrap.style.display = 'none';
+            }
         }
+
+        document.getElementById('load-more-btn').addEventListener('click', () => {
+            visibleCount += PAGE_SIZE;
+            renderGames();
+        });
 
         // Пошук з debounce
         let searchTimer;
@@ -616,8 +889,189 @@
             clearTimeout(searchTimer);
             searchTimer = setTimeout(() => {
                 currentSearch = e.target.value.toLowerCase().trim();
+                visibleCount = PAGE_SIZE;
                 renderGames();
             }, 300);
+        });
+
+        /* ================= ДОДАВАННЯ ГРИ ЧЕРЕЗ САЙТ (без Telegram) ================= */
+        const adminFab = document.getElementById('admin-fab');
+        const adminOverlay = document.getElementById('admin-modal-overlay');
+        const adminClose = document.getElementById('admin-close');
+        const adminKeyInput = document.getElementById('admin-key');
+        const adminQueryInput = document.getElementById('admin-query');
+        const adminSearchBtn = document.getElementById('admin-search-btn');
+        const adminResults = document.getElementById('admin-results');
+        const adminMsg = document.getElementById('admin-msg');
+
+        // Зберігаємо ключ у sessionStorage, щоб не вводити щоразу в межах сесії
+        adminKeyInput.value = sessionStorage.getItem('lvr_admin_key') || '';
+
+        // === СЕКРЕТНЕ ВІДКРИТТЯ ПАНЕЛІ АДМІНА ===
+        // Десктоп: комбінація клавіш Ctrl + Shift + A
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                adminFab.classList.toggle('visible');
+            }
+        });
+
+        // Мобільний: 5 швидких тапів по логотипу зверху
+        (function setupSecretTap() {
+            const logo = document.querySelector('.logo');
+            if (!logo) return;
+            const href = logo.getAttribute('href');
+            let taps = 0;
+            let tapTimer = null;
+
+            logo.addEventListener('click', (e) => {
+                e.preventDefault();
+                taps++;
+
+                if (taps >= 5) {
+                    clearTimeout(tapTimer);
+                    taps = 0;
+                    adminFab.classList.add('visible');
+                    return;
+                }
+
+                clearTimeout(tapTimer);
+                tapTimer = setTimeout(() => {
+                    if (taps > 0 && taps < 5 && href) {
+                        window.location.href = href;
+                    }
+                    taps = 0;
+                }, 400);
+            });
+        })();
+
+        adminFab.addEventListener('click', () => {
+            adminOverlay.classList.add('open');
+        });
+        adminClose.addEventListener('click', () => {
+            adminOverlay.classList.remove('open');
+        });
+        adminOverlay.addEventListener('click', (e) => {
+            if (e.target === adminOverlay) adminOverlay.classList.remove('open');
+        });
+
+        function showAdminMsg(text, type) {
+            adminMsg.textContent = text;
+            adminMsg.className = `admin-msg show ${type}`;
+        }
+
+        async function searchGamesFromSite() {
+            const key = adminKeyInput.value.trim();
+            const query = adminQueryInput.value.trim();
+
+            adminMsg.className = 'admin-msg';
+            adminResults.innerHTML = '';
+
+            if (!key) return showAdminMsg('Введіть ключ доступу', 'err');
+            if (!query) return showAdminMsg('Введіть назву гри', 'err');
+
+            sessionStorage.setItem('lvr_admin_key', key);
+
+            adminSearchBtn.disabled = true;
+            adminSearchBtn.textContent = 'Пошук...';
+
+            try {
+                const res = await fetch('/api/games/search-site', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, query })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    return showAdminMsg(data.error || 'Помилка пошуку', 'err');
+                }
+
+                if (!data.length) {
+                    return showAdminMsg('Нічого не знайдено', 'err');
+                }
+
+                adminResults.innerHTML = data.map((g, i) => `
+                    <div class="admin-result-card" data-index="${i}">
+                        <img src="${g.image_url}" alt="${g.title}">
+                        <div class="admin-result-info">
+                            <div class="title">${g.title}</div>
+                            <div class="plat">${g.platform} · ${g.platformsFull || ''}</div>
+                        </div>
+                        <div class="admin-result-actions">
+                            ${g.exists
+                                ? `<span style="font-size:11px; color:#ffcf6b; letter-spacing:1px;">Вже є</span>`
+                                : `<button class="admin-btn" data-add="${i}">Додати</button>`
+                            }
+                        </div>
+                    </div>
+                `).join('');
+
+                adminResults.querySelectorAll('[data-add]').forEach(btn => {
+                    btn.addEventListener('click', () => addGameFromSite(data[Number(btn.dataset.add)], btn));
+                });
+            } catch (err) {
+                showAdminMsg('Помилка з\'єднання із сервером', 'err');
+            } finally {
+                adminSearchBtn.disabled = false;
+                adminSearchBtn.textContent = 'Знайти';
+            }
+        }
+
+        async function addGameFromSite(game, btnEl) {
+            const key = adminKeyInput.value.trim();
+            btnEl.disabled = true;
+            btnEl.textContent = 'Додаємо...';
+
+            try {
+                const res = await fetch('/api/games/add-site', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, game })
+                });
+                const data = await res.json();
+
+                if (res.status === 409) {
+                    showAdminMsg(`«${game.title}» вже є в каталозі — пропущено, дублікат не додано.`, 'exists');
+                    btnEl.textContent = 'Вже є';
+                    return;
+                }
+
+                if (!res.ok) {
+                    showAdminMsg(data.error || 'Помилка додавання', 'err');
+                    btnEl.disabled = false;
+                    btnEl.textContent = 'Додати';
+                    return;
+                }
+
+                allGames.unshift(data.game);
+                buildPlatformFiltersIfNeeded(data.game.platform);
+                renderGames();
+                showAdminMsg(`«${game.title}» успішно додано на сайт!`, 'ok');
+                btnEl.textContent = 'Додано ✓';
+            } catch (err) {
+                showAdminMsg('Помилка з\'єднання із сервером', 'err');
+                btnEl.disabled = false;
+                btnEl.textContent = 'Додати';
+            }
+        }
+
+        function buildPlatformFiltersIfNeeded(platform) {
+            const bar = document.getElementById('platform-filters');
+            const exists = [...bar.querySelectorAll('.filter-btn')].some(b => b.dataset.platform === platform);
+            if (platform && !exists) {
+                const btn = document.createElement('button');
+                btn.className = 'filter-btn';
+                btn.dataset.platform = platform;
+                btn.textContent = platform;
+                btn.onclick = () => setFilter(platform);
+                bar.appendChild(btn);
+            }
+        }
+
+        adminSearchBtn.addEventListener('click', searchGamesFromSite);
+        adminQueryInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') searchGamesFromSite();
         });
 
         window.onload = loadGames;

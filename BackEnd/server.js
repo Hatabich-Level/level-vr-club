@@ -92,6 +92,16 @@ const pool = new Pool({
 })();
 
 
+/* ================= HELPERS ================= */
+async function gameExistsByTitle(title) {
+  if (!title) return false;
+  const result = await pool.query(
+    'SELECT id FROM games WHERE LOWER(title) = LOWER($1) LIMIT 1',
+    [title.trim()]
+  );
+  return result.rows.length > 0;
+}
+
 /* ================= ONLINE ================= */
 let onlineUsers = 0;
 io.on('connection', (socket) => {
@@ -365,7 +375,13 @@ bot.on('message', async (msg) => {
             }
 
             const game = response.data[0];
-            
+
+            // ЗАХИСТ ВІД ДУБЛІКАТІВ
+            const alreadyExists = await gameExistsByTitle(game.name);
+            if (alreadyExists) {
+                return bot.sendMessage(chatId, `⚠️ Гра <b>${game.name}</b> вже є в каталозі. Пропущено, щоб не дублювати.`, { parse_mode: 'HTML' });
+            }
+
             let imageUrl = "https://via.placeholder.com/500x700?text=No+Image";
             if (game.cover && game.cover.url) {
                 imageUrl = 'https:' + game.cover.url.replace('t_thumb', 't_1080p');
@@ -405,5 +421,105 @@ app.get('/api/games', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: 'Помилка завантаження ігор' });
+  }
+});
+
+/* ================= ДОДАВАННЯ ІГОР ЧЕРЕЗ САЙТ (без Telegram) ================= */
+const SITE_ADMIN_KEY = process.env.SITE_ADMIN_KEY;
+
+function checkSiteKey(req, res) {
+  if (!SITE_ADMIN_KEY || req.body.key !== SITE_ADMIN_KEY) {
+    res.status(403).json({ error: 'Невірний ключ доступу' });
+    return false;
+  }
+  return true;
+}
+
+// Пошук ігор у IGDB прямо з сайту (повертає кілька варіантів на вибір)
+app.post('/api/games/search-site', async (req, res) => {
+  if (!checkSiteKey(req, res)) return;
+
+  const query = (req.body.query || '').trim();
+  if (!query) {
+    return res.status(400).json({ error: 'Введіть назву гри' });
+  }
+
+  try {
+    const token = await getIgdbToken();
+    if (!token) return res.status(500).json({ error: 'Помилка авторизації IGDB' });
+
+    const response = await axios({
+      url: 'https://api.igdb.com/v4/games',
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Client-ID': TWITCH_CLIENT_ID,
+        'Authorization': `Bearer ${token}`
+      },
+      data: `search "${query}"; fields name, summary, platforms.name, cover.url; limit 6;`
+    });
+
+    const results = await Promise.all(response.data.map(async (game) => {
+      let imageUrl = "https://via.placeholder.com/500x700?text=No+Image";
+      if (game.cover && game.cover.url) {
+        imageUrl = 'https:' + game.cover.url.replace('t_thumb', 't_1080p');
+      }
+
+      const platformsList = game.platforms ? game.platforms.map(p => p.name).join(', ') : 'Невідомо';
+      let mainPlatform = 'Console';
+      if (platformsList.includes('PlayStation 5')) mainPlatform = 'PS5';
+      else if (platformsList.includes('PlayStation 4')) mainPlatform = 'PS4';
+      else if (platformsList.includes('PC')) mainPlatform = 'PC';
+      else if (platformsList.includes('VR')) mainPlatform = 'VR';
+
+      const description = (game.summary || 'Опис відсутній.').substring(0, 500);
+      const alreadyExists = await gameExistsByTitle(game.name);
+
+      return {
+        title: game.name,
+        platform: mainPlatform,
+        platformsFull: platformsList,
+        description,
+        image_url: imageUrl,
+        exists: alreadyExists
+      };
+    }));
+
+    res.json(results);
+  } catch (err) {
+    console.error('Помилка пошуку IGDB (сайт):', err.response ? err.response.data : err.message);
+    if (err.response && err.response.status === 401) igdbAccessToken = null;
+    res.status(500).json({ error: 'Помилка пошуку гри' });
+  }
+});
+
+// Додавання обраної гри з сайту (з повторною перевіркою дублікатів)
+app.post('/api/games/add-site', async (req, res) => {
+  if (!checkSiteKey(req, res)) return;
+
+  const game = req.body.game;
+  if (!game || !game.title) {
+    return res.status(400).json({ error: 'Немає даних гри' });
+  }
+
+  try {
+    const alreadyExists = await gameExistsByTitle(game.title);
+    if (alreadyExists) {
+      return res.status(409).json({ error: 'Ця гра вже є в каталозі' });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4) RETURNING *',
+      [game.title, game.platform || 'Console', game.description || '', game.image_url || '']
+    );
+
+    if (ADMIN_CHAT_ID) {
+      bot.sendMessage(ADMIN_CHAT_ID, `🎮 Гру "${game.title}" додано через сайт (без Telegram).`);
+    }
+
+    res.json({ success: true, game: result.rows[0] });
+  } catch (err) {
+    console.error('Помилка додавання гри (сайт):', err.message);
+    res.status(500).json({ error: 'Помилка додавання гри' });
   }
 });
