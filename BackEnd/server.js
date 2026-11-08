@@ -104,6 +104,8 @@ const pool = new Pool({
     );
   `);
 
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings (booking_date)`);
+
   // Секретний токен для привʼязки клієнта до замовлення через Telegram-бота
   await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS claim_token TEXT`);
 
@@ -332,11 +334,233 @@ function validateBooking(b) {
     total += price;
   }
 
+  const longest = Math.max(...cart.map((c) => c.duration));
+  if (startMin + longest * 60 > 22 * 60) {
+    return fail(`Клуб працює до 22:00. Для ${longest} год найпізніший початок — ${22 - longest}:00.`);
+  }
+
   const comment = clean(b.comment, 500) || 'Немає';
   return { data: { name, phone, digits, date, time, cart, total, comment } };
 }
 
 const PHONE_TAIL_SQL = "RIGHT(regexp_replace(phone, '\\D', '', 'g'), 9)";
+
+/* ================= AVAILABILITY (ВІЛЬНІ МІСЦЯ) ================= */
+// Обладнання клубу:
+//  • 3 звичайні PS5 (на кожній можна грати вдвох, але це одна приставка);
+//  • 2 окремі Oculus;
+//  • 1 PS VR2, підʼєднаний до 3-ї PS5: поки на ньому грають, ця приставка зайнята;
+//  • VIP-кімната: своя PS5 і свій VR, бронюється цілою кімнатою.
+const CAPACITY = { ps5: 3, oculus: 2, vr2: 1, vip: 1 };
+const OPEN_MIN = 10 * 60;
+const CLOSE_MIN = 22 * 60;
+
+const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+const toMin = (t) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+// Яке обладнання займає позиція замовлення (за назвою, яку надсилає сайт)
+function classifyItem(item) {
+  const name = String((item && (item.device || item.name || item.title)) || '');
+  const u = { ps5: 0, oculus: 0, vr2: 0, vrAny: 0, vip: 0 };
+
+  if (/VIP/i.test(name)) { u.vip = 1; return u; }
+
+  if (/^День народження/i.test(name)) {
+    const vr = /VR \((\d+) ос/i.exec(name);
+    if (vr) { u.vrAny = Number(vr[1]); return u; }          // будь-який вільний VR
+    const duo = /PS5 по двоє \((\d+) станц/i.exec(name);
+    if (duo) { u.ps5 = Number(duo[1]); return u; }
+    if (/PS5/i.test(name)) { u.ps5 = 1; return u; }
+    return u;
+  }
+
+  if (/oculus/i.test(name)) { u.oculus = 1; return u; }
+  if (/VR\s*2|PS\s*VR/i.test(name)) { u.vr2 = 1; return u; }
+  if (/PS\s*5|PlayStation/i.test(name)) { u.ps5 = 1; return u; }
+  return u; // невідома послуга: не блокуємо
+}
+
+function itemIntervals(startMin, cart) {
+  const out = [];
+  for (const it of cart || []) {
+    const units = classifyItem(it);
+    if (!(units.ps5 || units.oculus || units.vr2 || units.vrAny || units.vip)) continue;
+    const dur = Number(it && it.duration) > 0 ? Number(it.duration) * 60 : 60;
+    out.push({ start: startMin, end: startMin + dur, ...units });
+  }
+  return out;
+}
+
+// Рядки бронювань одного дня -> інтервали зайнятості обладнання
+function dayIntervals(rows) {
+  const out = [];
+  for (const r of rows || []) {
+    const start = toMin(r.booking_time);
+    if (start === null) continue;
+    let cart = r.cart_details;
+    if (typeof cart === 'string') { try { cart = JSON.parse(cart); } catch { cart = []; } }
+    out.push(...itemIntervals(start, Array.isArray(cart) ? cart : []));
+  }
+  return out;
+}
+
+function usageAt(intervals, t) {
+  const u = { ps5: 0, oculus: 0, vr2: 0, vrAny: 0, vip: 0 };
+  for (const i of intervals) {
+    if (i.start <= t && t < i.end) {
+      u.ps5 += i.ps5; u.oculus += i.oculus; u.vr2 += i.vr2; u.vrAny += i.vrAny; u.vip += i.vip;
+    }
+  }
+  return u;
+}
+
+// Скільки обладнання вільно (і чи не перевищено ліміти) при такому завантаженні
+function freeFromUsage(u) {
+  const x = Math.min(u.vrAny, Math.max(0, CAPACITY.oculus - u.oculus)); // «будь-який VR» спершу на Oculus
+  const y = u.vrAny - x;                                                // решта на PS VR2
+  const oculusUsed = u.oculus + x;
+  const vr2Used = u.vr2 + y;
+  const ps5Used = u.ps5 + vr2Used;                                      // PS VR2 займає 3-тю PS5
+  return {
+    ok: oculusUsed <= CAPACITY.oculus && vr2Used <= CAPACITY.vr2 && ps5Used <= CAPACITY.ps5 && u.vip <= CAPACITY.vip,
+    free: {
+      ps5: CAPACITY.ps5 - ps5Used,
+      oculus: CAPACITY.oculus - oculusUsed,
+      vr2: Math.min(CAPACITY.vr2 - vr2Used, CAPACITY.ps5 - ps5Used),
+      vip: CAPACITY.vip - u.vip
+    }
+  };
+}
+
+// Моменти, у які змінюється завантаження: початок вікна і старти бронювань усередині нього
+function checkpoints(intervals, from, to) {
+  const pts = new Set([from]);
+  for (const i of intervals) if (i.start > from && i.start < to) pts.add(i.start);
+  return [...pts];
+}
+
+// Скільки гарантовано вільно протягом усього вікна [from, to)
+function windowFree(existing, from, to) {
+  const min = { ps5: CAPACITY.ps5, oculus: CAPACITY.oculus, vr2: CAPACITY.vr2, vip: CAPACITY.vip };
+  for (const t of checkpoints(existing, from, to)) {
+    const f = freeFromUsage(usageAt(existing, t)).free;
+    for (const k of Object.keys(min)) min[k] = Math.min(min[k], Math.max(0, f[k]));
+  }
+  return min;
+}
+
+function fits(existing, requested) {
+  if (!requested.length) return true;
+  const from = Math.min(...requested.map((r) => r.start));
+  const to = Math.max(...requested.map((r) => r.end));
+  const all = existing.concat(requested);
+  return checkpoints(all, from, to).every((t) => freeFromUsage(usageAt(all, t)).ok);
+}
+
+function kyivToday() {
+  const n = kyivNow();
+  return { date: `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`, min: n.getHours() * 60 + n.getMinutes() };
+}
+
+// Найближчі вільні старти (крок 30 хв) для того самого набору обладнання
+function suggestStarts(existing, cart, date, requestedStart) {
+  const maxDur = Math.max(60, ...cart.map((i) => (Number(i.duration) || 1) * 60));
+  const today = kyivToday();
+  const out = [];
+  for (let s = OPEN_MIN; s + maxDur <= CLOSE_MIN; s += 30) {
+    if (s === requestedStart) continue;
+    if (date === today.date && s < today.min) continue;
+    if (fits(existing, itemIntervals(s, cart))) out.push(s);
+  }
+  out.sort((a, b) => Math.abs(a - requestedStart) - Math.abs(b - requestedStart));
+  return out.slice(0, 4).sort((a, b) => a - b).map(hhmm);
+}
+
+function shortageMessage(startMin, endMin, need, free, suggestions) {
+  const line = (label, total, f, asked) => `${label}: вільно ${f} з ${total} (зайнято ${total - f}), а ви обрали ${asked}`;
+  const parts = [];
+  if (need.ps5 > free.ps5) parts.push(line('PlayStation 5', CAPACITY.ps5, free.ps5, need.ps5));
+  if (need.oculus > free.oculus) parts.push(line('Oculus 2', CAPACITY.oculus, free.oculus, need.oculus));
+  if (need.vr2 > free.vr2) parts.push('PS VR2: зайнятий на цей час (він підʼєднаний до 3-ї PS5, тому потрібна й вона)');
+  if (need.vrAny > free.oculus + free.vr2) {
+    parts.push(line('VR-окуляри', CAPACITY.oculus + CAPACITY.vr2, free.oculus + free.vr2, need.vrAny));
+  }
+  if (need.vip > free.vip) parts.push('VIP-кімната: зайнята на цей час');
+  if (!parts.length) parts.push(`разом з обраним обладнанням місць не вистачає (PS5 вільно ${free.ps5} з ${CAPACITY.ps5}, Oculus ${free.oculus} з ${CAPACITY.oculus}, PS VR2 ${free.vr2 ? 'вільний' : 'зайнятий'})`);
+
+  const tail = suggestions.length
+    ? ` Найближчий вільний час: ${suggestions.join(', ')}.`
+    : ' На цей день вільного часу для такого набору немає.';
+  return `На ${hhmm(startMin)}–${hhmm(endMin)} не вистачає вільних місць. ${parts.join('; ')}.${tail}`;
+}
+
+// Чи можна поставити це замовлення поверх уже наявних бронювань дня
+function evaluateRequest(existing, date, time, cart) {
+  const start = toMin(time);
+  const requested = itemIntervals(start, cart);
+  if (fits(existing, requested)) return { ok: true };
+
+  const end = Math.max(...requested.map((r) => r.end));
+  const free = windowFree(existing, start, end);
+  const need = requested.reduce(
+    (n, r) => ({ ps5: n.ps5 + r.ps5, oculus: n.oculus + r.oculus, vr2: n.vr2 + r.vr2, vrAny: n.vrAny + r.vrAny, vip: n.vip + r.vip }),
+    { ps5: 0, oculus: 0, vr2: 0, vrAny: 0, vip: 0 }
+  );
+  const suggestions = suggestStarts(existing, cart, date, start);
+  return { ok: false, free, suggestions, message: shortageMessage(start, end, need, free, suggestions) };
+}
+
+const loadDayRows = (db, date) =>
+  db.query('SELECT booking_time, cart_details FROM bookings WHERE booking_date = $1', [date]);
+
+// Для сайту: скільки вільно на обраний час і чи пройде обраний набір (без створення бронювання)
+app.post('/api/availability', async (req, res) => {
+  try {
+    if (!isAllowedOrigin(req.headers.origin)) return res.status(403).json({ success: false, message: 'Заборонено.' });
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    const date = String(b.date || '');
+    const time = String(b.time || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+      return res.status(400).json({ success: false, message: 'Вкажіть дату й час.' });
+    }
+
+    const cart = (Array.isArray(b.cart) ? b.cart : []).slice(0, 10).map((it) => ({
+      device: String((it && it.device) || '').slice(0, 120),
+      duration: Number(it && it.duration) > 0 && Number(it.duration) <= 12 ? Number(it.duration) : 1,
+      persons: Number(it && it.persons) || undefined
+    }));
+    const hours = cart.length ? Math.max(...cart.map((i) => i.duration)) : (Number(b.hours) > 0 && Number(b.hours) <= 12 ? Number(b.hours) : 1);
+
+    const start = toMin(time);
+    const rows = await loadDayRows(pool, date);
+    const existing = dayIntervals(rows.rows);
+    const free = windowFree(existing, start, start + hours * 60);
+
+    const out = {
+      success: true, date, time, hours,
+      open: start >= OPEN_MIN && start + hours * 60 <= CLOSE_MIN,
+      resources: {
+        ps5: { total: CAPACITY.ps5, free: free.ps5, busy: CAPACITY.ps5 - free.ps5 },
+        oculus: { total: CAPACITY.oculus, free: free.oculus, busy: CAPACITY.oculus - free.oculus },
+        vr2: { total: CAPACITY.vr2, free: free.vr2, busy: CAPACITY.vr2 - free.vr2 },
+        vip: { total: CAPACITY.vip, free: free.vip, busy: CAPACITY.vip - free.vip }
+      }
+    };
+
+    const verdict = cart.length ? evaluateRequest(existing, date, time, cart) : { ok: true };
+    out.ok = verdict.ok;
+    if (!verdict.ok) { out.message = verdict.message; out.suggestions = verdict.suggestions; }
+
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
+  } catch (err) {
+    console.error('availability:', err.message);
+    res.status(500).json({ success: false, message: 'Не вдалося перевірити вільні місця.' });
+  }
+});
 
 /* ================= BOOK ================= */
 // Екранування для parse_mode HTML: імена/коментарі з сайту можуть містити < > &
@@ -395,14 +619,38 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
       return res.status(409).json({ success: false, code: 'DUPLICATE', message: `Бронювання на цей час для вашого номера вже існує. ${CALL_US}` });
     }
 
-    // 5. Зберігаємо. client_chat_id з запиту НЕ приймаємо: його ставить лише бот за секретним посиланням
+    // 5. Перевірка вільних місць і запис в одній транзакції: блокування по даті не дає
+    //    двом клієнтам одночасно зайняти останню приставку.
+    //    client_chat_id з запиту НЕ приймаємо: його ставить лише бот за секретним посиланням.
     const claimToken = crypto.randomBytes(8).toString('hex');
-    const dbRes = await pool.query(
-      `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, claim_token)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [name, phone, date, time, total, JSON.stringify(cart), comment, claimToken]
-    );
-    const newId = dbRes.rows[0].id;
+    const db = await pool.connect();
+    let newId;
+    try {
+      await db.query('BEGIN');
+      await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`bookings:${date}`]);
+
+      const dayRows = await loadDayRows(db, date);
+      const verdict = evaluateRequest(dayIntervals(dayRows.rows), date, time, cart);
+      if (!verdict.ok) {
+        await db.query('ROLLBACK');
+        return res.status(409).json({
+          success: false, code: 'UNAVAILABLE', message: verdict.message, suggestions: verdict.suggestions
+        });
+      }
+
+      const dbRes = await db.query(
+        `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, claim_token)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        [name, phone, date, time, total, JSON.stringify(cart), comment, claimToken]
+      );
+      newId = dbRes.rows[0].id;
+      await db.query('COMMIT');
+    } catch (e) {
+      try { await db.query('ROLLBACK'); } catch (_) { /* вже відкочено */ }
+      throw e;
+    } finally {
+      db.release();
+    }
     acceptedAt.push(Date.now());
 
     let tgMsg = `<b>👾 НОВЕ ЗАМОВЛЕННЯ #${newId}!</b>\n\n`;
@@ -577,7 +825,10 @@ function parseMoveInput(input, now) {
 }
 
 // Переносить бронювання. true = готово (або безнадійно), false = чекаємо виправлений ввід
-async function applyMove(adminChatId, id, input, source) {
+async function applyMove(adminChatId, id, rawInput, source) {
+  // «!» у кінці = перенести попри нестачу місць
+  const force = /(^|\s)!(?=\s|$)/.test(rawInput);
+  const input = String(rawInput).replace(/(^|\s)!(?=\s|$)/g, ' ').trim();
   const found = await pool.query('SELECT * FROM bookings WHERE id=$1', [id]);
   const b = found.rows[0];
   if (!b) {
@@ -605,6 +856,20 @@ async function applyMove(adminChatId, id, input, source) {
   if (new Date(y, mo - 1, d, hh, mm) < now) {
     await bot.sendMessage(adminChatId, '❌ Цей час уже минув. Вкажіть дату й час у майбутньому.');
     return false;
+  }
+
+  // Чи вистачає обладнання на новий час (саме це бронювання з розрахунку виключаємо)
+  if (!force) {
+    const day = await pool.query(
+      'SELECT booking_time, cart_details FROM bookings WHERE booking_date = $1 AND id <> $2', [newDate, id]
+    );
+    let cart = b.cart_details;
+    if (typeof cart === 'string') { try { cart = JSON.parse(cart); } catch { cart = []; } }
+    const verdict = evaluateRequest(dayIntervals(day.rows), newDate, newTime, Array.isArray(cart) ? cart : []);
+    if (!verdict.ok) {
+      await bot.sendMessage(adminChatId, `⚠️ ${verdict.message}\n\nЩоб перенести все одно, надішліть ту саму дату/час із «!» в кінці, наприклад: ${fmtDate(newDate)} ${newTime} !`);
+      return false;
+    }
   }
 
   await pool.query(

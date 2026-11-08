@@ -9,7 +9,7 @@ const CLUB_PRICES = {
     vip: 300,                    // VIP кімната (PS5 + VR), грн/год за кімнату
     psvr2: 200,                  // PS VR2, грн/год з особи
     oculus: 200,                 // Oculus 2, грн/год з особи
-    vr: 200                       // Загальна ціна VR-окулярів з особи (калькулятор ДН)
+    vr: 200                      // Загальна ціна VR-окулярів з особи (калькулятор ДН)
 };
 
 // =============================================
@@ -47,6 +47,111 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('dateTimeModal') || document.getElementById('bd-submit')) {
         prefetchFormToken(); // заодно "будить" сервер на Render
     }
+});
+
+// =============================================
+// 🟢 ВІЛЬНІ МІСЦЯ НА ОБРАНИЙ ЧАС
+// =============================================
+const AVAILABILITY_LABELS = { ps5: 'PS5', oculus: 'Oculus', vr2: 'PS VR2', vip: 'VIP' };
+
+async function fetchAvailability(date, time, items) {
+    const res = await fetch(`${BOOKING_API}/api/availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, time, cart: items })
+    });
+    return res.json();
+}
+
+// Малює у `box` скільки вільно/зайнято, а якщо обране не вміщається, пояснення і найближчий вільний час
+function renderAvailability(box, data, onPickTime) {
+    box.textContent = '';
+    if (!data || !data.success || !data.resources) return;
+
+    const mk = (tag, css, text) => {
+        const el = document.createElement(tag);
+        if (css) el.style.cssText = css;
+        if (text !== undefined) el.textContent = text;
+        return el;
+    };
+
+    const [hh, mm] = String(data.time).split(':').map(Number);
+    const endMin = hh * 60 + mm + Math.round(data.hours * 60);
+    const endStr = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+
+    const wrap = mk('div', 'margin:0 0 15px;padding:12px;border:1px dashed rgba(0,240,255,.4);font-family:"Noto Sans",sans-serif;font-size:13px;line-height:1.5;color:#ccc');
+    wrap.appendChild(mk('div', 'color:#00F0FF;font-weight:700;margin-bottom:8px', `Вільні місця ${data.time}–${endStr}:`));
+
+    const chips = mk('div', 'display:flex;flex-wrap:wrap;gap:6px');
+    for (const key of ['ps5', 'oculus', 'vr2', 'vip']) {
+        const r = data.resources[key];
+        const color = r.free === 0 ? '#FF6A9A' : (r.busy > 0 ? '#FFC857' : '#00FF88');
+        chips.appendChild(mk('span', `border:1px solid ${color};color:${color};padding:3px 10px`,
+            `${AVAILABILITY_LABELS[key]}: вільно ${r.free}, зайнято ${r.busy}`));
+    }
+    wrap.appendChild(chips);
+
+    if (data.open === false) {
+        wrap.appendChild(mk('div', 'margin-top:8px;color:#FFC857', 'Клуб працює щодня з 10:00 до 22:00.'));
+    }
+
+    if (data.ok === false && data.message) {
+        wrap.appendChild(mk('div', 'margin-top:8px;color:#FF6A9A', data.message));
+        if (data.suggestions && data.suggestions.length && onPickTime) {
+            const row = mk('div', 'display:flex;flex-wrap:wrap;gap:8px;margin-top:8px');
+            for (const t of data.suggestions) {
+                const b = mk('button', 'min-height:40px;padding:0 16px;background:none;border:1px solid #00F0FF;color:#00F0FF;font:600 14px "Noto Sans",sans-serif;cursor:pointer', t);
+                b.type = 'button';
+                b.addEventListener('click', () => onPickTime(t));
+                row.appendChild(b);
+            }
+            wrap.appendChild(row);
+        }
+    } else if (data.ok === true && data.hasCart) {
+        wrap.appendChild(mk('div', 'margin-top:8px;color:#00FF88', 'Для вашого замовлення місця є.'));
+    }
+    box.appendChild(wrap);
+}
+
+// Підключає перевірку до пари полів дата/час. Повертає функцію «перевірити зараз».
+function bindAvailability({ dateId, timeId, boxId, getCart }) {
+    const dateEl = document.getElementById(dateId);
+    const timeEl = document.getElementById(timeId);
+    const box = document.getElementById(boxId);
+    if (!dateEl || !timeEl || !box) return () => {};
+
+    let timer = null;
+    let seq = 0;
+
+    const run = async () => {
+        const date = dateEl.value;
+        const time = timeEl.value;
+        if (!date || !time) { box.textContent = ''; return; }
+        const mine = ++seq;
+        try {
+            const items = getCart();
+            const data = await fetchAvailability(date, time, items);
+            if (mine !== seq) return; // відповідь застаріла: клієнт уже змінив вибір
+            data.hasCart = items.length > 0;
+            renderAvailability(box, data, (t) => { timeEl.value = t; schedule(); });
+        } catch (e) {
+            if (mine === seq) box.textContent = '';
+        }
+    };
+    const schedule = () => { clearTimeout(timer); timer = setTimeout(run, 350); };
+
+    dateEl.addEventListener('change', schedule);
+    timeEl.addEventListener('change', schedule);
+    return schedule;
+}
+
+// Головна сторінка: вікно бронювання з кошика
+let refreshModalAvailability = () => {};
+document.addEventListener('DOMContentLoaded', () => {
+    refreshModalAvailability = bindAvailability({
+        dateId: 'date', timeId: 'time', boxId: 'availability-box',
+        getCart: () => cart.map(i => ({ device: i.device, duration: i.duration, persons: i.persons }))
+    });
 });
 
 // =============================================
@@ -497,6 +602,7 @@ function openModal() {
     document.body.style.overflow = "hidden"; 
     if(particles) particles.style.display = "none"; 
     updateAgeConfirmVisibility();
+    refreshModalAvailability();
   }
 }
 
@@ -607,6 +713,7 @@ const data = await response.json();
   } finally {
     isSubmitting = false;
     prefetchFormToken(); // токен одноразовий: беремо новий для наступної спроби
+    refreshModalAvailability(); // після відмови/успіху показуємо актуальні вільні місця
     if(submitBtn) submitBtn.innerText = "ПІДТВЕРДИТИ";
   }
 }

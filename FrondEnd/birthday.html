@@ -151,6 +151,7 @@
                             <input type="time" id="bd-time" class="cyber-input">
                         </div>
                     </div>
+                    <div id="bd-availability" aria-live="polite"></div>
                     <div class="input-group">
                         <label for="bd-comment">Побажання</label>
                         <textarea id="bd-comment" class="cyber-input" rows="2" maxlength="300" placeholder="Ім'я та вік іменинника, особливі побажання..."></textarea>
@@ -384,6 +385,7 @@
 
                 // Розрахунок для форми бронювання нижче
                 window.birthdayOrder = { items, total, guests, hours, vr: a.vr, overflow: a.overflow };
+                if (typeof window.refreshBirthdayAvailability === 'function') window.refreshBirthdayAvailability();
                 const ageBlock = document.getElementById('bd-age-block');
                 if (ageBlock) {
                     ageBlock.classList.toggle('hidden', a.vr === 0);
@@ -459,6 +461,12 @@
 
             let sending = false;
 
+            // Скільки вільно на обраний час (для позицій з калькулятора)
+            window.refreshBirthdayAvailability = bindAvailability({
+                dateId: 'bd-date', timeId: 'bd-time', boxId: 'bd-availability',
+                getCart: () => (window.birthdayOrder ? window.birthdayOrder.items.map(i => ({ device: i.device, duration: i.duration, persons: i.persons })) : [])
+            });
+
             $('bd-submit').addEventListener('click', async () => {
                 if (sending) return;
 
@@ -532,6 +540,7 @@
                     sending = false;
                 } finally {
                     if (typeof prefetchFormToken === 'function') prefetchFormToken(); // токен одноразовий
+                    window.refreshBirthdayAvailability();
                 }
             });
         })();
