@@ -12,6 +12,16 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+        <style>
+            .bd-form{margin-top:24px;border-top:1px solid rgba(0,240,255,.3);padding-top:22px}
+            .bd-form-title{margin:0 0 18px;color:#fff;font-size:1.05rem;letter-spacing:2px;text-transform:uppercase;text-align:center}
+            .bd-form .cyber-input{font-size:16px;width:100%;box-sizing:border-box}
+            .bd-note{margin:14px 0 0;color:#A9B4BC;font-family:'Noto Sans',sans-serif;font-size:.85rem;line-height:1.5;text-align:center}
+            .bd-note a{color:#00F0FF}
+            .bd-success{text-align:center;display:flex;flex-direction:column;gap:14px}
+            .bd-success[hidden],#bd-fields[hidden]{display:none}
+            .bd-success p{margin:0;color:#ddd;font-family:'Noto Sans',sans-serif;line-height:1.5}
+        </style>
     </head>
     <body>
 
@@ -118,7 +128,51 @@
                 <span id="calc-total-value" style="font-size:1.6rem;color:#00F0FF;text-shadow:0 0 10px #00F0FF;">0 грн</span>
             </div>
 
-            <a href="/index.html#contact" class="contact-button" id="calc-book-btn">Зв'язатися з нами</a>
+            <div class="bd-form" id="bd-form">
+                <div id="bd-fields">
+                    <h3 class="bd-form-title">Дані для бронювання</h3>
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="bd-name">Ім'я</label>
+                            <input type="text" id="bd-name" class="cyber-input" placeholder="Ваше ім'я" autocomplete="name" maxlength="60">
+                        </div>
+                        <div class="input-group">
+                            <label for="bd-phone">Телефон</label>
+                            <input type="tel" id="bd-phone" class="cyber-input" placeholder="+380..." autocomplete="tel" inputmode="tel" maxlength="20">
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="bd-date">Дата</label>
+                            <input type="date" id="bd-date" class="cyber-input">
+                        </div>
+                        <div class="input-group">
+                            <label for="bd-time">Час початку</label>
+                            <input type="time" id="bd-time" class="cyber-input">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="bd-comment">Побажання</label>
+                        <textarea id="bd-comment" class="cyber-input" rows="2" maxlength="300" placeholder="Ім'я та вік іменинника, особливі побажання..."></textarea>
+                    </div>
+                    <div class="age-confirm hidden" id="bd-age-block">
+                        <input type="checkbox" id="bd-age-checkbox">
+                        <label for="bd-age-checkbox">Підтверджую, що всім гравцям, які будуть користуватись VR-окулярами, є 10 років або більше (це необхідна умова безпечного використання VR)</label>
+                    </div>
+                    <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
+                        <label for="bd-website">Не заповнюйте це поле</label>
+                        <input type="text" id="bd-website" name="website" tabindex="-1" autocomplete="off">
+                    </div>
+                    <button type="button" class="contact-button" id="bd-submit" style="font-family:inherit;font-size:1rem">Забронювати день народження</button>
+                    <p class="bd-note">Після відправки адміністратор підтвердить бронювання. Або зателефонуйте: <a href="tel:+380985897388">098 589 73 88</a></p>
+                </div>
+                <div class="bd-success" id="bd-success" hidden>
+                    <h3 class="bd-form-title" style="margin:0">Бронювання створено</h3>
+                    <p id="bd-success-text"></p>
+                    <a class="contact-button" id="bd-bot-link" href="#" target="_blank" rel="noopener">Підключити Telegram-бота</a>
+                    <p class="bd-note" style="margin:0">Через бота ви отримаєте нагадування за годину до візиту та повідомлення, якщо час доведеться змінити.</p>
+                </div>
+            </div>
         </div>
 
     </section>
@@ -294,34 +348,50 @@
 
                 let total = 0;
                 let lines = '';
+                const items = [];
 
                 if (a.vr > 0) {
                     const vrTotal = a.vr * hours * VR_PRICE;
                     total += vrTotal;
+                    items.push({ device: `День народження · VR (${a.vr} ос.)`, duration: hours, persons: a.vr, price: vrTotal });
                     lines += `<div class="calc-breakdown-line"><span>VR-окуляри: ${a.vr} ос. × ${hours} год × ${VR_PRICE} грн</span><span>${vrTotal} грн</span></div>`;
                 }
 
                 if (a.ps5FullStations > 0) {
                     const t = a.ps5FullStations * hours * PS5_TWO_PRICE;
                     total += t;
+                    items.push({ device: `День народження · PS5 по двоє (${a.ps5FullStations} станц.)`, duration: hours, persons: a.ps5FullStations * 2, price: t });
                     lines += `<div class="calc-breakdown-line"><span>PS5 по двоє: ${a.ps5FullStations} станц. × ${hours} год × ${PS5_TWO_PRICE} грн</span><span>${t} грн</span></div>`;
                 }
 
                 if (a.ps5HasSolo) {
                     const t = hours * PS5_ONE_PRICE;
                     total += t;
+                    items.push({ device: 'День народження · PS5 (1 гравець)', duration: hours, persons: 1, price: t });
                     lines += `<div class="calc-breakdown-line"><span>PS5 одна особа: 1 станц. × ${hours} год × ${PS5_ONE_PRICE} грн</span><span>${t} грн</span></div>`;
                 }
 
                 if (a.vipGuests > 0) {
                     const t = hours * VIP_PRICE;
                     total += t;
+                    items.push({ device: `День народження · VIP-кімната (${a.vipGuests} ос., PS5)`, duration: hours, persons: a.vipGuests, price: t });
                     lines += `<div class="calc-breakdown-line"><span>VIP-кімната (${a.vipGuests} ос., PS5): ${hours} год × ${VIP_PRICE} грн</span><span>${t} грн</span></div>`;
                 }
 
                 linesEl.innerHTML = lines;
                 totalValueEl.textContent = total + ' грн';
                 totalLabelEl.textContent = 'Орієнтовна вартість';
+
+                // Розрахунок для форми бронювання нижче
+                window.birthdayOrder = { items, total, guests, hours, vr: a.vr, overflow: a.overflow };
+                const ageBlock = document.getElementById('bd-age-block');
+                if (ageBlock) {
+                    ageBlock.classList.toggle('hidden', a.vr === 0);
+                    if (a.vr === 0) {
+                        const cb = document.getElementById('bd-age-checkbox');
+                        if (cb) cb.checked = false;
+                    }
+                }
 
                 // Попередження про 3-тю станцію (VR замість PS5-на-двох)
                 vrLimitWarn.classList.toggle('show', a.thirdStationUsedForVr);
@@ -371,6 +441,99 @@
             });
 
             syncGuestsAndVr();
+        })();
+        </script>
+
+        <script>
+        (function () {
+            const API_URL = ((typeof BOOKING_API !== 'undefined') ? BOOKING_API : 'https://level-vr-club.onrender.com') + '/api/book';
+            const BOT_USERNAME = 'priwetabot'; // той самий бот, що й у script.js
+            const $ = (id) => document.getElementById(id);
+            const pad = (n) => String(n).padStart(2, '0');
+            const kyivNow = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }));
+            const warn = (msg) => (typeof showNotification === 'function') ? showNotification(msg, 'warning') : alert(msg);
+
+            // не даємо обрати минулу дату
+            const t = kyivNow();
+            $('bd-date').min = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+
+            let sending = false;
+
+            $('bd-submit').addEventListener('click', async () => {
+                if (sending) return;
+
+                const order = window.birthdayOrder;
+                const name = $('bd-name').value.trim();
+                const phone = $('bd-phone').value.trim();
+                const date = $('bd-date').value;
+                const time = $('bd-time').value;
+                const extra = $('bd-comment').value.trim();
+
+                if (!order || !order.items.length) return warn('Спочатку розрахуйте вартість вище.');
+                if (name.length < 2) return warn('Вкажіть, будь ласка, ім\u2019я.');
+                if (phone.replace(/\D/g, '').length < 10) return warn('Вкажіть коректний номер телефону.');
+                if (!date || !time) return warn('Оберіть дату та час початку.');
+                if (order.vr > 0 && !$('bd-age-checkbox').checked) {
+                    return warn('Підтвердьте, що всім гравцям у VR є 10 років або більше.');
+                }
+
+                // графік клубу: щодня, початок + тривалість мають вкластися в робочі години
+                const open = (typeof WORK_HOURS !== 'undefined') ? WORK_HOURS.openHour : 10;
+                const close = (typeof WORK_HOURS !== 'undefined') ? WORK_HOURS.closeHour : 22;
+                const [hh, mm] = time.split(':').map(Number);
+                const startMin = hh * 60 + mm;
+                if (startMin < open * 60 || startMin + order.hours * 60 > close * 60) {
+                    return warn(`Клуб працює ${open}:00–${close}:00. Для ${order.hours} год найпізніший початок — ${close - order.hours}:00.`);
+                }
+
+                const [y, mo, d] = date.split('-').map(Number);
+                if (new Date(y, mo - 1, d, hh, mm) < kyivNow()) return warn('Цей час уже минув. Оберіть пізніший.');
+
+                let comment = `🎂 День народження, гостей: ${order.guests}`;
+                if (order.overflow > 0) comment += `. ⚠ Одночасно не вміщаються ${order.overflow} гост. (грають по черзі)`;
+                if (extra) comment += `. ${extra}`;
+
+                sending = true;
+                const btn = $('bd-submit');
+                const label = btn.textContent;
+                btn.textContent = 'ВІДПРАВКА...';
+                btn.disabled = true;
+
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            cart: order.items, totalPrice: order.total, date, time, name, phone, comment,
+                            website: $('bd-website').value,
+                            formToken: (typeof takeFormToken === 'function') ? await takeFormToken() : null
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        const e = new Error(data.message || 'Помилка обробки на сервері');
+                        e.fromServer = !!data.message;
+                        throw e;
+                    }
+
+                    $('bd-success-text').textContent =
+                        `Замовлення #${data.orderId}: ${pad(d)}.${pad(mo)}.${y} о ${time}, орієнтовно ${order.total} грн. Адміністратор підтвердить бронювання.`;
+                    $('bd-bot-link').href = `https://t.me/${BOT_USERNAME}?start=order_${data.orderId}${data.claimToken ? '_' + data.claimToken : ''}`;
+                    $('bd-fields').hidden = true;
+                    $('bd-success').hidden = false;
+                    $('bd-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } catch (err) {
+                    console.error('Помилка бронювання:', err);
+                    if (typeof showNotification === 'function') {
+                        showNotification(err.fromServer ? err.message : 'Не вдалося відправити бронювання. Спробуйте ще раз або зателефонуйте нам.', 'error');
+                    }
+                    btn.textContent = label;
+                    btn.disabled = false;
+                    sending = false;
+                } finally {
+                    if (typeof prefetchFormToken === 'function') prefetchFormToken(); // токен одноразовий
+                }
+            });
         })();
         </script>
 

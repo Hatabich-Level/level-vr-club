@@ -9,8 +9,45 @@ const CLUB_PRICES = {
     vip: 300,                    // VIP кімната (PS5 + VR), грн/год за кімнату
     psvr2: 200,                  // PS VR2, грн/год з особи
     oculus: 200,                 // Oculus 2, грн/год з особи
-    vr: 200                      // Загальна ціна VR-окулярів з особи (калькулятор ДН)
+    vr: 200                       // Загальна ціна VR-окулярів з особи (калькулятор ДН)
 };
+
+// =============================================
+// 🛡️ ЗАХИСТ ФОРМ БРОНЮВАННЯ ВІД СПАМУ
+// =============================================
+const BOOKING_API = 'https://level-vr-club.onrender.com';
+let formToken = null;
+let formTokenAt = 0;
+
+// Токен форми: сервер видає його при відкритті сторінки, а приймає лише через 3+ секунди.
+async function prefetchFormToken() {
+    formToken = null;
+    try {
+        const res = await fetch(`${BOOKING_API}/api/form-token`, { cache: 'no-store' });
+        const data = await res.json();
+        formToken = data.token || null;
+        formTokenAt = Date.now();
+    } catch (e) {
+        formToken = null;
+    }
+}
+
+// Бере токен для відправки (одноразовий). Якщо сторінку щойно відкрили,
+// трохи чекає, щоб пройти перевірку "не надто швидко".
+async function takeFormToken() {
+    if (!formToken) await prefetchFormToken();
+    const wait = 3300 - (Date.now() - formTokenAt);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    const t = formToken;
+    formToken = null;
+    return t;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('dateTimeModal') || document.getElementById('bd-submit')) {
+        prefetchFormToken(); // заодно "будить" сервер на Render
+    }
+});
 
 // =============================================
 // 🕒 СТАТУС РОБОТИ КЛУБУ (щодня 10:00–22:00, Київський час)
@@ -527,12 +564,14 @@ async function submitOrder() {
       time: time,
       name: name,
       phone: phone,
-      comment: comment
+      comment: comment,
+      website: document.getElementById("hp-website")?.value || "",
+      formToken: await takeFormToken()
     };
 
     
    // Звертаємося до нашого бекенду на Render
-    const response = await fetch('https://level-vr-club.onrender.com/api/book', {
+    const response = await fetch(`${BOOKING_API}/api/book`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -552,7 +591,7 @@ const data = await response.json();
       
       if (userWantsBot) {
          // Перекидаємо клієнта в бота з його унікальним номером замовлення
-         window.open(`https://t.me/${botUsername}?start=order_${orderId}`, '_blank');
+         window.open(`https://t.me/${botUsername}?start=order_${orderId}${data.claimToken ? '_' + data.claimToken : ''}`, '_blank');
       }
 
       clearCart(); 
@@ -567,6 +606,7 @@ const data = await response.json();
     showNotification(`Помилка: ${error.message}`, "error");
   } finally {
     isSubmitting = false;
+    prefetchFormToken(); // токен одноразовий: беремо новий для наступної спроби
     if(submitBtn) submitBtn.innerText = "ПІДТВЕРДИТИ";
   }
 }
