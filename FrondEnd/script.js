@@ -12,6 +12,7 @@ const CLUB_PRICES = {
     vr: 200                      // Загальна ціна VR-окулярів з особи (калькулятор ДН)
 };
 
+
 // =============================================
 // 🛡️ ЗАХИСТ ФОРМ БРОНЮВАННЯ ВІД СПАМУ
 // =============================================
@@ -48,6 +49,51 @@ document.addEventListener('DOMContentLoaded', () => {
         prefetchFormToken(); // заодно "будить" сервер на Render
     }
 });
+
+// =============================================
+// 👤 АКАУНТ КЛІЄНТА (вхід через Telegram або Google на сторінці account.html)
+// =============================================
+const LevelAuth = (() => {
+    const KEY = 'levelAuthToken';
+    let mem = '';
+    let mePromise = null;
+
+    const getToken = () => { try { return localStorage.getItem(KEY) || mem; } catch (e) { return mem; } };
+    const setToken = (token) => {
+        mem = token || '';
+        mePromise = null;
+        try { token ? localStorage.setItem(KEY, token) : localStorage.removeItem(KEY); } catch (e) { /* приватний режим */ }
+    };
+    const headers = () => { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
+
+    // Профіль поточного клієнта або null, якщо це гість
+    const me = () => {
+        if (!getToken()) return Promise.resolve(null);
+        if (!mePromise) {
+            mePromise = fetch(`${BOOKING_API}/api/me`, { headers: headers(), cache: 'no-store' })
+                .then(async (res) => {
+                    if (res.status === 401) { setToken(''); return null; } // сесія закінчилась
+                    const data = await res.json();
+                    return data && data.success ? data.user : null;
+                })
+                .catch(() => null);
+        }
+        return mePromise;
+    };
+
+    return { getToken, setToken, headers, me };
+})();
+
+// Клієнту, який увійшов, підставляємо імʼя й телефон у форми бронювання
+async function prefillBookingForms() {
+    const user = await LevelAuth.me();
+    if (!user) return;
+    for (const [id, value] of [['name', user.name], ['phone', user.phone], ['bd-name', user.name], ['bd-phone', user.phone]]) {
+        const el = document.getElementById(id);
+        if (el && !el.value && value) el.value = value;
+    }
+}
+document.addEventListener('DOMContentLoaded', prefillBookingForms);
 
 // =============================================
 // 🟢 ВІЛЬНІ МІСЦЯ НА ОБРАНИЙ ЧАС
@@ -603,6 +649,7 @@ function openModal() {
     if(particles) particles.style.display = "none"; 
     updateAgeConfirmVisibility();
     refreshModalAvailability();
+    prefillBookingForms();
   }
 }
 
@@ -680,7 +727,8 @@ async function submitOrder() {
     const response = await fetch(`${BOOKING_API}/api/book`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...LevelAuth.headers()
       },
       body: JSON.stringify(orderData)
     });
@@ -692,8 +740,13 @@ const data = await response.json();
       const botUsername = "priwetabot"; 
       const orderId = data.orderId;
 
-      showNotification(`✅ Бронювання #${orderId} успішно створено!`, "success");
-      const userWantsBot = await showConfirm(`Перейти до Telegram-бота та отримати квиток із підтвердженням?`);
+      if (data.botLinked) {
+        // Клієнт увійшов через Telegram: бот уже знає, кому писати
+        showNotification(`✅ Бронювання #${orderId} створено! Підтвердження й нагадування прийдуть вам у Telegram.`, "success");
+      } else {
+        showNotification(`✅ Бронювання #${orderId} успішно створено!`, "success");
+      }
+      const userWantsBot = !data.botLinked && await showConfirm(`Перейти до Telegram-бота та отримати квиток із підтвердженням?`);
       
       if (userWantsBot) {
          // Перекидаємо клієнта в бота з його унікальним номером замовлення

@@ -21,6 +21,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 const SITE_URL = process.env.SITE_URL;
+const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim(); // для входу через Google (необовʼязково)
 
 /* ================= ROLES ================= */
 const isOwner = (id) => id.toString() === OWNER_CHAT_ID;
@@ -109,6 +110,32 @@ const pool = new Pool({
   // Секретний токен для привʼязки клієнта до замовлення через Telegram-бота
   await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS claim_token TEXT`);
 
+  // Акаунти клієнтів (вхід через Telegram або Google) та їхні сесії
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      telegram_id TEXT UNIQUE,
+      google_sub TEXT UNIQUE,
+      email TEXT,
+      name TEXT,
+      username TEXT,
+      phone TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_login_at TIMESTAMP
+    );
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP NOT NULL
+    );
+  `);
+  await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS user_id INTEGER`);
+  await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS confirmed BOOLEAN DEFAULT FALSE`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings (user_id)`);
+
   // НОВА ТАБЛИЦЯ ДЛЯ ІГОР
   await client.query(`
     CREATE TABLE IF NOT EXISTS games (
@@ -141,6 +168,10 @@ bot.onText(/\/start(?: (.*))?/, async (msg, match) => {
   const payload = match[1];
 
   try {
+    if (payload && payload.startsWith('login_')) {
+      return await handleLoginStart(msg, payload.slice(6));
+    }
+
     if (payload && payload.startsWith('order_')) {
       // Формат: order_<id>_<секретний токен із відповіді сервера>
       const [, idStr, token] = payload.split('_');
@@ -562,6 +593,383 @@ app.post('/api/availability', async (req, res) => {
   }
 });
 
+/* ================= AUTH (ВХІД: TELEGRAM + ЗАПАСНИЙ GOOGLE) ================= */
+const SESSION_DAYS = 30;
+const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
+const authOrigin = (req, res) => {
+  if (isAllowedOrigin(req.headers.origin)) return true;
+  res.status(403).json({ success: false, message: 'Заборонено.' });
+  return false;
+};
+
+// Що про акаунт можна віддавати на сайт
+const publicUser = (u) => ({
+  id: u.id,
+  name: u.name || '',
+  phone: u.phone || '',
+  email: u.email || '',
+  username: u.username || '',
+  hasTelegram: !!u.telegram_id,
+  hasGoogle: !!u.google_sub
+});
+
+// Сесія: випадковий токен у клієнта, у базі лише його хеш
+async function createSession(userId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  await pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
+  await pool.query(
+    `INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, NOW() + ($3 || ' days')::interval)`,
+    [sha256(token), userId, String(SESSION_DAYS)]
+  );
+  await pool.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [userId]);
+  return token;
+}
+
+// Хто робить запит (за заголовком Authorization: Bearer <токен>), або null
+async function accountFromRequest(req) {
+  const m = /^Bearer ([0-9a-f]{64})$/.exec(String(req.headers.authorization || ''));
+  if (!m) return null;
+  const tokenHash = sha256(m[1]);
+  const r = await pool.query(
+    `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
+    [tokenHash]
+  );
+  return r.rows[0] ? { user: r.rows[0], tokenHash } : null;
+}
+
+async function requireAccount(req, res) {
+  const account = await accountFromRequest(req);
+  if (!account) res.status(401).json({ success: false, code: 'AUTH', message: 'Увійдіть в акаунт.' });
+  return account;
+}
+
+let botUsernameCache = (process.env.BOT_USERNAME || '').replace(/^@/, '').trim();
+async function getBotUsername() {
+  if (botUsernameCache) return botUsernameCache;
+  try {
+    const me = await bot.getMe();
+    if (me && me.username) botUsernameCache = me.username;
+  } catch (e) {
+    console.error('Не вдалося отримати імʼя бота:', e.message);
+  }
+  return botUsernameCache || 'priwetabot';
+}
+
+const authStartLimit = createLimiter({ windowMs: 10 * 60 * 1000, max: 30, message: TOO_MANY });
+const authLoginLimit = createLimiter({ windowMs: 10 * 60 * 1000, max: 20, message: TOO_MANY });
+
+app.get('/api/auth/config', async (req, res) => {
+  res.json({ success: true, botUsername: await getBotUsername(), googleClientId: GOOGLE_CLIENT_ID || null });
+});
+
+/* ---------- Telegram: сайт видає код, клієнт підтверджує вхід у боті ---------- */
+const LOGIN_TTL = 10 * 60 * 1000;
+const LOGIN_MAX_PENDING = 5000;
+const loginRequests = new Map(); // code -> { secretHash, status, tg, userId, expires }
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, r] of loginRequests) if (r.expires < now) loginRequests.delete(code);
+}, 60 * 1000).unref();
+
+const LOGIN_STALE = '⌛ Посилання для входу застаріло. Поверніться на сайт і натисніть «Увійти через Telegram» ще раз.';
+
+app.post('/api/auth/telegram/start', authStartLimit, async (req, res) => {
+  if (!authOrigin(req, res)) return;
+  const code = crypto.randomBytes(10).toString('hex');   // іде в посилання на бота
+  const secret = crypto.randomBytes(24).toString('hex'); // лишається в браузері, яким почали вхід
+  if (loginRequests.size >= LOGIN_MAX_PENDING) loginRequests.delete(loginRequests.keys().next().value);
+  loginRequests.set(code, { secretHash: sha256(secret), status: 'pending', expires: Date.now() + LOGIN_TTL });
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    success: true, code, secret,
+    link: `https://t.me/${await getBotUsername()}?start=login_${code}`,
+    expiresIn: LOGIN_TTL / 1000
+  });
+});
+
+app.post('/api/auth/telegram/poll', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    const code = String(b.code || '');
+    const r = /^[0-9a-f]{20}$/.test(code) ? loginRequests.get(code) : null;
+    const secretHash = sha256(b.secret || '');
+    res.set('Cache-Control', 'no-store');
+
+    if (!r || r.expires < Date.now() ||
+        !crypto.timingSafeEqual(Buffer.from(r.secretHash), Buffer.from(secretHash))) {
+      return res.json({ success: true, status: 'expired' });
+    }
+    if (r.status === 'denied') {
+      loginRequests.delete(code);
+      return res.json({ success: true, status: 'denied' });
+    }
+    if (r.status !== 'confirmed') {
+      return res.json({ success: true, status: 'pending', opened: r.status === 'awaiting' });
+    }
+
+    loginRequests.delete(code); // код одноразовий: видаляємо до будь-яких await
+    const token = await createSession(r.userId);
+    const u = await pool.query('SELECT * FROM users WHERE id = $1', [r.userId]);
+    res.json({ success: true, status: 'ok', token, user: publicUser(u.rows[0]) });
+  } catch (e) {
+    console.error('auth poll:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+// Клієнт відкрив у Telegram посилання ...?start=login_<code>
+async function handleLoginStart(msg, code) {
+  const chatId = msg.chat.id;
+  if (msg.chat.type !== 'private' || !msg.from || msg.from.is_bot) return;
+
+  const r = /^[0-9a-f]{20}$/.test(code) ? loginRequests.get(code) : null;
+  const takenByOther = r && r.tg && r.tg.id !== msg.from.id;
+  if (!r || r.expires < Date.now() || takenByOther || (r.status !== 'pending' && r.status !== 'awaiting')) {
+    return bot.sendMessage(chatId, LOGIN_STALE);
+  }
+
+  r.status = 'awaiting';
+  r.tg = {
+    id: msg.from.id,
+    name: [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ').slice(0, 60),
+    username: msg.from.username || ''
+  };
+
+  // Питаємо явно: якщо посилання людині підсунув хтось інший, вона натисне «Це не я»
+  return bot.sendMessage(
+    chatId,
+    '🔐 Вхід на сайт LEVEL VR CLUB\n\nВи щойно натиснули «Увійти через Telegram» на нашому сайті?\n\n' +
+    'Якщо ні, натисніть «Це не я»: можливо, хтось намагається увійти у ваш акаунт.',
+    { reply_markup: { inline_keyboard: [[
+      { text: '✅ Так, увійти', callback_data: `login_ok_${code}` },
+      { text: '❌ Це не я', callback_data: `login_no_${code}` }
+    ]] } }
+  );
+}
+
+async function handleLoginCallback(query) {
+  const m = /^login_(ok|no)_([0-9a-f]{20})$/.exec(query.data);
+  if (!m || !query.message) return;
+  const where = { chat_id: query.message.chat.id, message_id: query.message.message_id };
+  const r = loginRequests.get(m[2]);
+
+  if (!r || r.expires < Date.now() || r.status !== 'awaiting' || !r.tg || r.tg.id !== query.from.id) {
+    return bot.editMessageText(LOGIN_STALE, where);
+  }
+
+  if (m[1] === 'no') {
+    r.status = 'denied';
+    return bot.editMessageText('❌ Вхід скасовано. У ваш акаунт ніхто не увійшов.', where);
+  }
+
+  const u = await pool.query(
+    `INSERT INTO users (telegram_id, name, username) VALUES ($1, $2, $3)
+     ON CONFLICT (telegram_id) DO UPDATE
+       SET username = EXCLUDED.username, name = COALESCE(NULLIF(users.name, ''), EXCLUDED.name)
+     RETURNING *`,
+    [String(r.tg.id), r.tg.name, r.tg.username]
+  );
+  r.userId = u.rows[0].id;
+  r.status = 'confirmed';
+  await bot.editMessageText('✅ Вхід підтверджено. Поверніться на сайт: кабінет відкриється сам.', where);
+
+  if (!u.rows[0].phone) {
+    await bot.sendMessage(
+      where.chat_id,
+      'Щоб ми могли звʼязатися з вами щодо бронювань, поділіться номером телефону (це потрібно лише один раз).',
+      { reply_markup: {
+        keyboard: [[{ text: '📱 Поділитися номером', request_contact: true }]],
+        resize_keyboard: true, one_time_keyboard: true
+      } }
+    );
+  }
+}
+
+// Клієнт натиснув «Поділитися номером»
+bot.on('message', async (msg) => {
+  if (!msg.contact || !msg.from || msg.chat.type !== 'private') return;
+  try {
+    if (msg.contact.user_id !== msg.from.id) {
+      return bot.sendMessage(msg.chat.id, 'Надішліть, будь ласка, саме свій номер кнопкою «Поділитися номером».');
+    }
+    const digits = String(msg.contact.phone_number || '').replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 15) return;
+    const r = await pool.query('UPDATE users SET phone = $1 WHERE telegram_id = $2', [`+${digits}`, String(msg.from.id)]);
+    if (r.rowCount) {
+      await bot.sendMessage(msg.chat.id, '✅ Дякуємо! Номер збережено.', { reply_markup: { remove_keyboard: true } });
+    }
+  } catch (e) {
+    console.error('Помилка збереження номера:', e.message);
+  }
+});
+
+/* ---------- Google: сайт надсилає ID-токен, сервер перевіряє підпис Google ---------- */
+let googleKeys = { byKid: new Map(), expires: 0, fetchedAt: 0 };
+
+async function loadGoogleKeys(force) {
+  const now = Date.now();
+  if (!force && googleKeys.byKid.size && googleKeys.expires > now) return googleKeys.byKid;
+  if (force && now - googleKeys.fetchedAt < 60 * 1000) return googleKeys.byKid; // не частіше ніж раз на хвилину
+
+  const r = await axios.get('https://www.googleapis.com/oauth2/v3/certs', { timeout: 8000 });
+  const byKid = new Map();
+  for (const jwk of (r.data && r.data.keys) || []) {
+    if (jwk.kty === 'RSA' && jwk.kid) byKid.set(jwk.kid, crypto.createPublicKey({ key: jwk, format: 'jwk' }));
+  }
+  if (!byKid.size) throw new Error('Google не віддав ключі');
+  const maxAge = Number((/max-age=(\d+)/.exec((r.headers && r.headers['cache-control']) || '') || [])[1]) || 3600;
+  googleKeys = { byKid, expires: now + Math.min(maxAge, 24 * 3600) * 1000, fetchedAt: now };
+  return byKid;
+}
+
+// Повертає вміст токена або кидає помилку. Перевіряє: підпис, для кого виданий, ким і чи не прострочений.
+async function verifyGoogleIdToken(idToken) {
+  const raw = String(idToken || '');
+  const parts = raw.split('.');
+  if (raw.length > 8192 || parts.length !== 3) throw new Error('формат');
+
+  const decode = (p) => JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));
+  const header = decode(parts[0]);
+  const payload = decode(parts[1]);
+  if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new Error('алгоритм');
+
+  let key = (await loadGoogleKeys(false)).get(header.kid);
+  if (!key) key = (await loadGoogleKeys(true)).get(header.kid); // Google періодично змінює ключі
+  if (!key) throw new Error('невідомий ключ');
+
+  const signed = Buffer.from(`${parts[0]}.${parts[1]}`);
+  if (!crypto.verify('RSA-SHA256', signed, key, Buffer.from(parts[2], 'base64url'))) throw new Error('підпис');
+
+  const now = Date.now() / 1000;
+  if (payload.aud !== GOOGLE_CLIENT_ID) throw new Error('aud');
+  if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') throw new Error('iss');
+  if (!(Number(payload.exp) > now)) throw new Error('прострочений');
+  if (payload.nbf && Number(payload.nbf) > now + 60) throw new Error('nbf');
+  if (typeof payload.sub !== 'string' || !payload.sub) throw new Error('sub');
+  return payload;
+}
+
+app.post('/api/auth/google', authLoginLimit, async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    if (!GOOGLE_CLIENT_ID) {
+      return res.status(503).json({ success: false, message: 'Вхід через Google не налаштовано.' });
+    }
+
+    let payload;
+    try {
+      payload = await verifyGoogleIdToken(req.body && req.body.credential);
+    } catch (e) {
+      console.warn('Google-вхід відхилено:', e.message);
+      return res.status(401).json({ success: false, message: 'Не вдалося підтвердити вхід через Google. Спробуйте ще раз.' });
+    }
+
+    // Акаунт шукаємо лише за sub (незмінний ідентифікатор Google), а не за email
+    const u = await pool.query(
+      `INSERT INTO users (google_sub, email, name) VALUES ($1, $2, $3)
+       ON CONFLICT (google_sub) DO UPDATE
+         SET email = EXCLUDED.email, name = COALESCE(NULLIF(users.name, ''), EXCLUDED.name)
+       RETURNING *`,
+      [payload.sub, String(payload.email || '').slice(0, 200), String(payload.name || payload.given_name || '').slice(0, 60)]
+    );
+    const token = await createSession(u.rows[0].id);
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, token, user: publicUser(u.rows[0]) });
+  } catch (e) {
+    console.error('auth google:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+/* ---------- Кабінет ---------- */
+app.get('/api/me', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, user: publicUser(account.user) });
+  } catch (e) {
+    console.error('me:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.get('/api/me/bookings', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+
+    const r = await pool.query(
+      `SELECT id, booking_date, booking_time, total_price, cart_details, confirmed
+         FROM bookings WHERE user_id = $1
+        ORDER BY booking_date DESC, booking_time DESC LIMIT 100`,
+      [account.user.id]
+    );
+
+    const today = kyivToday();
+    const upcoming = [];
+    const past = [];
+    for (const b of r.rows) {
+      let cart = b.cart_details;
+      if (typeof cart === 'string') { try { cart = JSON.parse(cart); } catch { cart = []; } }
+      const items = (Array.isArray(cart) ? cart : []).map((i) => ({
+        device: String(i.device || ''), duration: Number(i.duration) || 0, price: Number(i.price) || 0
+      }));
+      const longest = Math.max(1, ...items.map((i) => i.duration));
+      const endMin = (toMin(b.booking_time) || 0) + longest * 60;
+      const isPast = b.booking_date < today.date || (b.booking_date === today.date && endMin <= today.min);
+      (isPast ? past : upcoming).push({
+        id: b.id, date: b.booking_date, time: b.booking_time,
+        total: Number(b.total_price) || 0, confirmed: !!b.confirmed, items
+      });
+    }
+    upcoming.reverse(); // найближчі зверху
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, upcoming, past });
+  } catch (e) {
+    console.error('me/bookings:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.post('/api/me/profile', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const account = await requireAccount(req, res);
+    if (!account) return;
+
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+    const name = clean(b.name, 60);
+    const phone = clean(b.phone, 25);
+    const digits = phone.replace(/\D/g, '');
+
+    if (name.length < 2) return res.status(400).json({ success: false, message: 'Вкажіть, будь ласка, ім’я.' });
+    if (!/^[+\d\s()\-.]+$/.test(phone) || digits.length < 10 || digits.length > 13) {
+      return res.status(400).json({ success: false, message: 'Вкажіть коректний номер телефону.' });
+    }
+
+    const u = await pool.query('UPDATE users SET name = $1, phone = $2 WHERE id = $3 RETURNING *', [name, phone, account.user.id]);
+    res.json({ success: true, user: publicUser(u.rows[0]) });
+  } catch (e) {
+    console.error('me/profile:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const account = await accountFromRequest(req);
+    if (account) await pool.query('DELETE FROM sessions WHERE token_hash = $1', [account.tokenHash]);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('logout:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
 /* ================= BOOK ================= */
 // Екранування для parse_mode HTML: імена/коментарі з сайту можуть містити < > &
 const escapeHtml = (v) => String(v ?? '')
@@ -622,6 +1030,11 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
     // 5. Перевірка вільних місць і запис в одній транзакції: блокування по даті не дає
     //    двом клієнтам одночасно зайняти останню приставку.
     //    client_chat_id з запиту НЕ приймаємо: його ставить лише бот за секретним посиланням.
+    //    Якщо клієнт увійшов в акаунт, бронювання привʼязується до нього, а Telegram для
+    //    нагадувань береться з акаунта (перевірений входом), тож посилання на бота вже не потрібне.
+    const account = await accountFromRequest(req).catch(() => null);
+    const accountChatId = account && account.user.telegram_id ? account.user.telegram_id : null;
+
     const claimToken = crypto.randomBytes(8).toString('hex');
     const db = await pool.connect();
     let newId;
@@ -639,9 +1052,9 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
       }
 
       const dbRes = await db.query(
-        `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, claim_token)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [name, phone, date, time, total, JSON.stringify(cart), comment, claimToken]
+        `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, claim_token, user_id, client_chat_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        [name, phone, date, time, total, JSON.stringify(cart), comment, claimToken, account ? account.user.id : null, accountChatId]
       );
       newId = dbRes.rows[0].id;
       await db.query('COMMIT');
@@ -652,6 +1065,11 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
       db.release();
     }
     acceptedAt.push(Date.now());
+
+    // Перше бронювання з акаунта без телефону: запамʼятовуємо номер, щоб наступного разу підставити
+    if (account && !account.user.phone) {
+      pool.query('UPDATE users SET phone = $1 WHERE id = $2', [phone, account.user.id]).catch(() => {});
+    }
 
     let tgMsg = `<b>👾 НОВЕ ЗАМОВЛЕННЯ #${newId}!</b>\n\n`;
     tgMsg += `👤 <b>Ім'я:</b> ${escapeHtml(name)}\n`;
@@ -679,7 +1097,7 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
       console.error(`Не вдалося сповістити адміна про замовлення #${newId}:`, e.message);
     }
 
-    res.json({ success: true, orderId: newId, claimToken });
+    res.json({ success: true, orderId: newId, claimToken, botLinked: !!accountChatId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: `Помилка сервера. Спробуйте пізніше. ${CALL_US}` });
@@ -691,6 +1109,16 @@ const cancelReasons = {};
 
 /* ================= CALLBACK ================= */
 bot.on('callback_query', async (query) => {
+  // Кнопки підтвердження входу на сайт (натискає сам клієнт у своєму чаті з ботом)
+  if (typeof query.data === 'string' && query.data.startsWith('login_')) {
+    try {
+      await handleLoginCallback(query);
+    } catch (e) {
+      console.error('Помилка підтвердження входу:', e.message);
+    }
+    return bot.answerCallbackQuery(query.id).catch(() => {});
+  }
+
   const action = query.data; // ВАЖЛИВО: Оголошуємо action!
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
@@ -698,7 +1126,9 @@ bot.on('callback_query', async (query) => {
 
   try {
     if (action.startsWith('confirm_')) {
-      const res = await pool.query('SELECT client_chat_id, booking_time FROM bookings WHERE id = $1', [orderId]);
+      const res = await pool.query(
+        'UPDATE bookings SET confirmed = TRUE WHERE id = $1 RETURNING client_chat_id, booking_time', [orderId]
+      );
       
       if (res.rows[0]?.client_chat_id) {
         await bot.sendMessage(res.rows[0].client_chat_id, `✅ Замовлення #${orderId} підтверджено на ${res.rows[0].booking_time}!`);

@@ -19,7 +19,7 @@
             .bd-note{margin:14px 0 0;color:#A9B4BC;font-family:'Noto Sans',sans-serif;font-size:.85rem;line-height:1.5;text-align:center}
             .bd-note a{color:#00F0FF}
             .bd-success{text-align:center;display:flex;flex-direction:column;gap:14px}
-            .bd-success[hidden],#bd-fields[hidden]{display:none}
+            .bd-success[hidden],#bd-fields[hidden],#bd-bot-link[hidden]{display:none}
             .bd-success p{margin:0;color:#ddd;font-family:'Noto Sans',sans-serif;line-height:1.5}
         </style>
     </head>
@@ -49,6 +49,7 @@
                 <a href="index.html#pricing">Тарифи</a>
                 <a href="birthday.html">День народження</a>
                 <a href="index.html#contact">Контакти</a> 
+                <a href="account.html" id="account-link">Кабінет</a>
             </div>
 
             <div class="cart-trigger" onclick="toggleCart()">
@@ -171,7 +172,7 @@
                     <h3 class="bd-form-title" style="margin:0">Бронювання створено</h3>
                     <p id="bd-success-text"></p>
                     <a class="contact-button" id="bd-bot-link" href="#" target="_blank" rel="noopener">Підключити Telegram-бота</a>
-                    <p class="bd-note" style="margin:0">Через бота ви отримаєте нагадування за годину до візиту та повідомлення, якщо час доведеться змінити.</p>
+                    <p class="bd-note" id="bd-bot-note" style="margin:0">Через бота ви отримаєте нагадування за годину до візиту та повідомлення, якщо час доведеться змінити.</p>
                 </div>
             </div>
         </div>
@@ -510,7 +511,7 @@
                 try {
                     const res = await fetch(API_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof LevelAuth !== 'undefined') ? LevelAuth.headers() : {}),
                         body: JSON.stringify({
                             cart: order.items, totalPrice: order.total, date, time, name, phone, comment,
                             website: $('bd-website').value,
@@ -527,6 +528,11 @@
                     $('bd-success-text').textContent =
                         `Замовлення #${data.orderId}: ${pad(d)}.${pad(mo)}.${y} о ${time}, орієнтовно ${order.total} грн. Адміністратор підтвердить бронювання.`;
                     $('bd-bot-link').href = `https://t.me/${BOT_USERNAME}?start=order_${data.orderId}${data.claimToken ? '_' + data.claimToken : ''}`;
+                    if (data.botLinked) {
+                        // Клієнт увійшов через Telegram: бот уже знає, кому писати
+                        $('bd-bot-link').hidden = true;
+                        $('bd-bot-note').textContent = 'Підтвердження і нагадування прийдуть вам у Telegram.';
+                    }
                     $('bd-fields').hidden = true;
                     $('bd-success').hidden = false;
                     $('bd-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
