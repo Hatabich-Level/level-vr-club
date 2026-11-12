@@ -31,21 +31,61 @@
             .acc-or::before,.acc-or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.15)}
             #acc-google-btn{display:flex;justify-content:center;min-height:44px}
             .acc-card .cyber-input{font-size:16px;width:100%;box-sizing:border-box}
-            .acc-who{margin:-12px 0 18px;color:#A9B4BC;font-size:.85rem;text-align:center;overflow-wrap:anywhere}
-            .acc-booking{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-top:1px solid rgba(255,255,255,.1)}
-            .acc-booking:first-child{border-top:0;padding-top:0}
-            .acc-date{flex:0 0 58px;border:1px solid #00F0FF;text-align:center;padding:6px 0;color:#fff}
-            .acc-date b{display:block;font-size:1.4rem;line-height:1.1}
-            .acc-date span{font-size:.7rem;letter-spacing:2px;text-transform:uppercase;color:#A9B4BC}
-            .acc-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-            .acc-info strong{color:#fff;font-size:.98rem;overflow-wrap:anywhere}
-            .acc-info span{color:#A9B4BC;font-size:.85rem}
-            .acc-chip{align-self:flex-start;margin-top:4px;padding:2px 10px;border:1px solid currentColor;font-size:.75rem;font-weight:600}
-            .acc-chip.ok{color:#00FF88}.acc-chip.wait{color:#FFC857}.acc-chip.done{color:#A9B4BC}
-            .acc-empty{margin:0 0 16px;color:#A9B4BC;font-size:.92rem;line-height:1.5}
             .acc-logout{display:block;margin:4px auto 30px;min-height:44px;padding:0 22px;background:none;border:1px solid #444;color:#A9B4BC;font:600 .85rem 'Noto Sans',sans-serif;cursor:pointer}
             .acc-logout:hover{border-color:#FF6A9A;color:#FF6A9A}
-            .acc-stack{width:100%;display:flex;flex-direction:column;align-items:center;gap:14px}
+            /* --- кабінет (як у макеті) --- */
+            .acc-cab{width:100%;max-width:1120px;display:flex;flex-direction:column;gap:28px;font-family:'Noto Sans',sans-serif;color:#fff;text-align:left}
+            .acc-hero{background:#0B1216;border:1px solid rgba(0,240,255,.4);padding:32px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px 32px;flex-wrap:wrap;clip-path:polygon(20px 0,100% 0,100% calc(100% - 20px),calc(100% - 20px) 100%,0 100%,0 20px)}
+            .acc-hero-main,.acc-hero-stat{display:flex;flex-direction:column;gap:8px;min-width:0}
+            .acc-hero-stat{text-align:right;gap:4px}
+            .acc-label{font-size:12px;letter-spacing:3px;color:#00F0FF;text-transform:uppercase}
+            .acc-label.dim{color:#A9B4BC}
+            .acc-name{margin:0;font-family:'Noto Sans',sans-serif;font-size:34px;font-weight:800;letter-spacing:1px;line-height:1.15;text-transform:none;overflow-wrap:anywhere;color:#fff}
+            .acc-sub{font-size:14px;color:#A9B4BC;line-height:1.5;overflow-wrap:anywhere}
+            .acc-big{font-size:56px;font-weight:800;color:#00F0FF;line-height:1}
+            .acc-cols{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+            .acc-main{flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px}
+            .acc-side{flex:0 1 340px;min-width:280px;display:flex;flex-direction:column;gap:16px}
+            .acc-tabs{display:flex;gap:8px;border-bottom:1px solid #1B2A30}
+            .acc-tab{min-height:44px;padding:0 20px;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;color:#A9B4BC;font:600 14px 'Noto Sans',sans-serif;cursor:pointer}
+            .acc-tab[aria-selected="true"]{color:#fff;border-bottom-color:#00F0FF}
+            .acc-list{display:flex;flex-direction:column;gap:16px}
+            .acc-booking{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:20px;background:#0B1216;border:1px solid #1B2A30}
+            .acc-date{flex:0 0 72px;text-align:center;border:1px solid #00F0FF;padding:8px 0;color:#fff}
+            .acc-date b{display:block;font-size:28px;font-weight:800;line-height:1.15}
+            .acc-date span{font-size:12px;color:#A9B4BC;letter-spacing:2px;text-transform:uppercase}
+            .acc-info{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:4px}
+            .acc-info strong{font-size:16px;font-weight:600;color:#fff;overflow-wrap:anywhere}
+            .acc-info span{font-size:13px;color:#A9B4BC}
+            .acc-info span.acc-price{color:#00F0FF}
+            .acc-chip{flex:0 0 auto;padding:4px 10px;border:1px solid currentColor;font-size:12px;font-weight:600}
+            .acc-chip.ok{color:#00FF88}.acc-chip.wait{color:#FFC857}.acc-chip.done{color:#A9B4BC}
+            .acc-empty{margin:0;padding:20px;background:#0B1216;border:1px solid #1B2A30;color:#A9B4BC;font-size:14px;line-height:1.5}
+            .acc-cta{align-self:flex-start;display:inline-flex;align-items:center;min-height:44px;padding:0 22px;border:1px solid #00F0FF;color:#00F0FF;font:600 13px 'Noto Sans',sans-serif;letter-spacing:1px;text-transform:uppercase;text-decoration:none}
+            .acc-cta:hover{background:rgba(0,240,255,.1)}
+            .acc-hint{margin:0;color:#A9B4BC;font-size:13px;line-height:1.5}
+            .acc-box{padding:24px;background:#0B1216;border:1px solid #1B2A30;display:flex;flex-direction:column;gap:12px}
+            .acc-box h2{margin:0;font-family:'Noto Sans',sans-serif;font-size:16px;font-weight:800;letter-spacing:1px;text-transform:none;color:#fff}
+            .acc-box p{margin:0;font-size:14px;line-height:1.5;color:#A9B4BC}
+            .acc-box label{font-size:12px;letter-spacing:2px;color:#00F0FF;text-transform:uppercase}
+            .acc-box input{min-height:44px;box-sizing:border-box;width:100%;padding:0 12px;background:#070A0D;border:1px solid #2A3A42;color:#fff;font:16px 'Noto Sans',sans-serif;outline:none}
+            .acc-box input:focus{border-color:#00F0FF}
+            .acc-save{min-height:44px;margin-top:4px;background:#00F0FF;border:0;color:#000;font:800 13px 'Noto Sans',sans-serif;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+            .acc-save:hover{background:#fff}
+            .acc-save:disabled{opacity:.6;cursor:default}
+            .acc-box .acc-msg{margin:0;text-align:left}
+            .acc-box .acc-msg.ok{color:#00FF88}
+            .acc-box .acc-msg:empty{min-height:0}
+            .acc-cab .acc-logout{display:block;width:100%;margin:0;border-color:#2A3A42}
+            @media (max-width:600px){
+                .acc-hero{padding:24px 20px}
+                .acc-name{font-size:26px}
+                .acc-hero-stat{text-align:left}
+                .acc-big{font-size:44px}
+                .acc-booking{gap:14px;padding:16px}
+                .acc-side{flex-basis:100%;min-width:0}
+                .acc-tab{padding:0 14px}
+            }
         </style>
     </head>
     <body>
@@ -97,7 +137,7 @@
 
     <section class="birthday-section acc-section">
         <div class="birthday-content">
-            <h1 class="birthday-title">Особистий кабінет</h1>
+            <h1 class="birthday-title" id="acc-page-title">Особистий кабінет</h1>
         </div>
 
         <div class="calc-wrapper acc-card" id="acc-loading">
@@ -126,37 +166,46 @@
         </div>
 
         <!-- Клієнт: кабінет -->
-        <div class="acc-stack" id="acc-cabinet" hidden>
-            <div class="calc-wrapper acc-card">
-                <h2 class="calc-title" id="acc-hello">Вітаємо!</h2>
-                <p class="acc-who" id="acc-who"></p>
-                <div class="form-grid">
-                    <div class="input-group">
-                        <label for="acc-name">Ім'я</label>
-                        <input type="text" id="acc-name" class="cyber-input" autocomplete="name" maxlength="60">
-                    </div>
-                    <div class="input-group">
-                        <label for="acc-phone">Телефон</label>
-                        <input type="tel" id="acc-phone" class="cyber-input" placeholder="+380..." autocomplete="tel" inputmode="tel" maxlength="25">
-                    </div>
+        <div class="acc-cab" id="acc-cabinet" hidden>
+            <div class="acc-hero">
+                <div class="acc-hero-main">
+                    <span class="acc-label">Особистий кабінет</span>
+                    <h2 class="acc-name" id="acc-hello"></h2>
+                    <span class="acc-sub" id="acc-who"></span>
                 </div>
-                <button type="button" class="contact-button" id="acc-save">Зберегти</button>
-                <p class="acc-msg" id="acc-profile-msg" role="status" aria-live="polite"></p>
+                <div class="acc-hero-stat">
+                    <span class="acc-label dim">Майбутні бронювання</span>
+                    <span class="acc-big" id="acc-count">0</span>
+                    <span class="acc-sub" id="acc-count-sub"></span>
+                </div>
             </div>
 
-            <div class="calc-wrapper acc-card">
-                <h2 class="calc-title">Мої бронювання</h2>
-                <div id="acc-upcoming"></div>
-                <a class="contact-button" href="index.html#pricing">Забронювати гру</a>
-                <p class="acc-note">Тут з'являються бронювання, зроблені після входу в кабінет.</p>
-            </div>
+            <div class="acc-cols">
+                <div class="acc-main">
+                    <div class="acc-tabs" role="tablist" aria-label="Бронювання">
+                        <button type="button" class="acc-tab" role="tab" id="acc-tab-up" aria-controls="acc-upcoming" aria-selected="true">Бронювання</button>
+                        <button type="button" class="acc-tab" role="tab" id="acc-tab-past" aria-controls="acc-past" aria-selected="false">Історія</button>
+                    </div>
+                    <div class="acc-list" id="acc-upcoming" role="tabpanel" aria-labelledby="acc-tab-up"></div>
+                    <div class="acc-list" id="acc-past" role="tabpanel" aria-labelledby="acc-tab-past" hidden></div>
+                    <a class="acc-cta" href="index.html#pricing">Забронювати гру</a>
+                    <p class="acc-hint">Тут з'являються бронювання, зроблені після входу в кабінет.</p>
+                </div>
 
-            <div class="calc-wrapper acc-card" id="acc-past-card" hidden>
-                <h2 class="calc-title">Історія</h2>
-                <div id="acc-past"></div>
+                <aside class="acc-side">
+                    <section class="acc-box">
+                        <h2>Мої дані</h2>
+                        <p>Ім'я і телефон самі підставляються у форму бронювання.</p>
+                        <label for="acc-name">Ім'я</label>
+                        <input type="text" id="acc-name" autocomplete="name" maxlength="60">
+                        <label for="acc-phone">Телефон</label>
+                        <input type="tel" id="acc-phone" placeholder="+380..." autocomplete="tel" inputmode="tel" maxlength="25">
+                        <button type="button" class="acc-save" id="acc-save">Зберегти</button>
+                        <p class="acc-msg" id="acc-profile-msg" role="status" aria-live="polite"></p>
+                    </section>
+                    <button type="button" class="acc-logout" id="acc-logout">Вийти з акаунта</button>
+                </aside>
             </div>
-
-            <button type="button" class="acc-logout" id="acc-logout">Вийти з акаунта</button>
         </div>
     </section>
         
@@ -273,6 +322,7 @@
                 show('acc-loading', name === 'loading');
                 show('acc-login', name === 'login');
                 show('acc-cabinet', name === 'cabinet');
+                show('acc-page-title', name !== 'cabinet'); // у кабінеті заголовок уже є в блоці профілю
             }
             function setMsg(id, text, ok) {
                 $(id).textContent = text || '';
@@ -422,7 +472,7 @@
             function bookingCard(b, past) {
                 const p = String(b.date).split('-').map(Number);
                 const date = new Date(p[0], p[1] - 1, p[2]);
-                const row = el('div', 'acc-booking');
+                const row = el('article', 'acc-booking');
 
                 const box = el('div', 'acc-date');
                 box.appendChild(el('b', '', String(p[2])));
@@ -431,49 +481,75 @@
 
                 const info = el('div', 'acc-info');
                 const items = b.items || [];
-                info.appendChild(el('strong', '', items.map((i) => i.device).join(' + ') || 'Бронювання'));
+                info.appendChild(el('strong', '', items.map((i) => `${i.device} · ${i.duration} год`).join(' + ') || 'Бронювання'));
                 const t = String(b.time).split(':').map(Number);
                 const longest = Math.max(1, ...items.map((i) => Number(i.duration) || 0));
-                info.appendChild(el('span', '', `${DAYS[date.getDay()]}, ${b.time}–${hhmm(t[0] * 60 + t[1] + longest * 60)}`));
-                info.appendChild(el('span', '', `Замовлення #${b.id} · ${b.total} грн`));
-                if (past) info.appendChild(el('span', 'acc-chip done', 'Завершено'));
-                else info.appendChild(el('span', 'acc-chip ' + (b.confirmed ? 'ok' : 'wait'), b.confirmed ? 'Підтверджено' : 'Очікує підтвердження'));
+                const day = DAYS[date.getDay()];
+                info.appendChild(el('span', '', `${day.charAt(0).toUpperCase() + day.slice(1)}, ${b.time}–${hhmm(t[0] * 60 + t[1] + longest * 60)}`));
+                info.appendChild(el('span', 'acc-price', `Замовлення #${b.id} · ${b.total} грн`));
                 row.appendChild(info);
+
+                if (past) row.appendChild(el('span', 'acc-chip done', 'Завершено'));
+                else row.appendChild(el('span', 'acc-chip ' + (b.confirmed ? 'ok' : 'wait'), b.confirmed ? 'Підтверджено' : 'Очікує підтвердження'));
                 return row;
             }
 
+            function selectTab(which) {
+                const past = which === 'past';
+                $('acc-tab-up').setAttribute('aria-selected', String(!past));
+                $('acc-tab-past').setAttribute('aria-selected', String(past));
+                show('acc-upcoming', !past);
+                show('acc-past', past);
+            }
+            $('acc-tab-up').addEventListener('click', () => selectTab('up'));
+            $('acc-tab-past').addEventListener('click', () => selectTab('past'));
+
             async function loadBookings() {
                 const up = $('acc-upcoming');
+                const past = $('acc-past');
                 up.textContent = '';
+                past.textContent = '';
                 up.appendChild(el('p', 'acc-empty', 'Завантаження...'));
                 try {
                     const r = await api('/api/me/bookings');
                     if (r.status === 401) { LevelAuth.setToken(''); return showLogin('Сесія закінчилась. Увійдіть ще раз.'); }
                     if (!r.data.success) throw new Error('server');
+
                     up.textContent = '';
                     if (!r.data.upcoming.length) up.appendChild(el('p', 'acc-empty', 'Майбутніх бронювань поки немає.'));
                     r.data.upcoming.forEach((b) => up.appendChild(bookingCard(b, false)));
 
-                    const past = $('acc-past');
-                    past.textContent = '';
+                    if (!r.data.past.length) past.appendChild(el('p', 'acc-empty', 'Історія поки порожня. Тут будуть ваші минулі ігри.'));
                     r.data.past.forEach((b) => past.appendChild(bookingCard(b, true)));
-                    show('acc-past-card', r.data.past.length > 0);
+
+                    $('acc-count').textContent = String(r.data.upcoming.length);
+                    $('acc-count-sub').textContent = `Завершених ігор: ${r.data.past.length}`;
+                    $('acc-tab-past').textContent = r.data.past.length ? `Історія (${r.data.past.length})` : 'Історія';
                 } catch (e) {
                     up.textContent = '';
                     up.appendChild(el('p', 'acc-empty', 'Не вдалося завантажити бронювання. Оновіть сторінку.'));
                 }
             }
 
+            function fillHero(user) {
+                $('acc-hello').textContent = user.name || 'Гравець';
+                const how = [];
+                if (user.hasTelegram) how.push('Вхід через Telegram');
+                if (user.hasGoogle) how.push('Вхід через Google');
+                if (user.username) how.push('@' + user.username);
+                if (user.email) how.push(user.email);
+                if (user.phone) how.push(user.phone);
+                $('acc-who').textContent = how.join(' · ');
+            }
+
             function showCabinet(user) {
                 screen('cabinet');
-                const first = String(user.name || '').split(' ')[0];
-                $('acc-hello').textContent = first ? `Вітаємо, ${first}!` : 'Вітаємо!';
-                const how = [];
-                if (user.hasTelegram) how.push('Вхід через Telegram' + (user.username ? ` (@${user.username})` : ''));
-                if (user.hasGoogle) how.push('Вхід через Google' + (user.email ? ` (${user.email})` : ''));
-                $('acc-who').textContent = how.join(' · ');
+                fillHero(user);
                 $('acc-name').value = user.name || '';
                 $('acc-phone').value = user.phone || '';
+                $('acc-count').textContent = '0';
+                $('acc-count-sub').textContent = '';
+                selectTab('up');
                 setMsg('acc-profile-msg', user.phone ? '' : 'Додайте телефон, і він сам підставлятиметься у бронювання.');
                 loadBookings();
             }
@@ -490,8 +566,7 @@
                         LevelAuth.setToken(LevelAuth.getToken()); // скидаємо кеш профілю
                         $('acc-name').value = r.data.user.name;
                         $('acc-phone').value = r.data.user.phone;
-                        const first = String(r.data.user.name || '').split(' ')[0];
-                        $('acc-hello').textContent = first ? `Вітаємо, ${first}!` : 'Вітаємо!';
+                        fillHero(r.data.user);
                         setMsg('acc-profile-msg', 'Збережено.', true);
                     } else {
                         setMsg('acc-profile-msg', r.data.message || 'Не вдалося зберегти.');
