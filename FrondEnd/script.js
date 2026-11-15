@@ -53,6 +53,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================
 // 👤 АКАУНТ КЛІЄНТА (вхід через Telegram або Google на сторінці account.html)
 // =============================================
+// Пункт меню: гостю «Реєстрація/Вхід», клієнту, який увійшов, «Кабінет»
+function updateAccountLink() {
+    const link = document.getElementById('account-link');
+    if (!link) return;
+    let token = '';
+    try { token = (typeof LevelAuth !== 'undefined' && LevelAuth.getToken()) || localStorage.getItem('levelAuthToken') || ''; } catch (e) { /* приватний режим */ }
+    link.textContent = token ? 'Кабінет' : 'Реєстрація/Вхід';
+}
+
 const LevelAuth = (() => {
     const KEY = 'levelAuthToken';
     let mem = '';
@@ -63,6 +72,7 @@ const LevelAuth = (() => {
         mem = token || '';
         mePromise = null;
         try { token ? localStorage.setItem(KEY, token) : localStorage.removeItem(KEY); } catch (e) { /* приватний режим */ }
+        updateAccountLink();
     };
     const headers = () => { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
 
@@ -83,6 +93,8 @@ const LevelAuth = (() => {
 
     return { getToken, setToken, headers, me };
 })();
+
+updateAccountLink(); // одразу, щоб напис не блимав; якщо сесія вже недійсна, me() нижче поверне «Реєстрація/Вхід»
 
 // Клієнту, який увійшов, підставляємо імʼя й телефон у форми бронювання
 async function prefillBookingForms() {
