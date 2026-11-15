@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="shortcut icon" href="images/favicon.svg" type="/images/svg+xml">
+    <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
     <style>
         /* ===== КАТАЛОГ ІГОР — ПОВНИЙ РЕДИЗАЙН ===== */
 
@@ -829,10 +829,19 @@
         const PAGE_SIZE = 8;
         let visibleCount = PAGE_SIZE;
 
+        // Заглушка, якщо в гри немає обкладинки або вона не завантажилась
+        const NO_COVER = 'images/placeholder.svg';
+        // Назви й описи приходять із бази: показуємо їх як текст, а не як HTML
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        // onerror спрацьовує один раз: якщо не вантажиться й заглушка, запити не зациклюються
+        const COVER_FALLBACK = `onerror="this.onerror=null;this.src='${NO_COVER}'"`;
+
         async function loadGames() {
             try {
                 const response = await fetch('/api/games');
-                allGames = await response.json();
+                const data = await response.json();
+                if (!response.ok || !Array.isArray(data)) throw new Error('bad response');
+                allGames = data;
 
                 buildPlatformFilters();
                 renderGames();
@@ -884,7 +893,7 @@
 
             if (currentSearch) {
                 filtered = filtered.filter(g =>
-                    g.title.toLowerCase().includes(currentSearch) ||
+                    (g.title || '').toLowerCase().includes(currentSearch) ||
                     (g.description || '').toLowerCase().includes(currentSearch)
                 );
             }
@@ -908,19 +917,20 @@
                 <div class="game-card" style="animation-delay:${i * 0.06}s">
                     <div class="game-poster">
                         <img
-                            src="${game.image_url || 'images/placeholder.jpg'}"
-                            alt="${game.title}"
+                            src="${esc(game.image_url || NO_COVER)}"
+                            alt="${esc(game.title)}"
                             loading="lazy"
-                            onerror="this.src='images/placeholder.jpg'"
+                            decoding="async"
+                            ${COVER_FALLBACK}
                         >
-                        <div class="platform-badge">${game.platform || '—'}</div>
+                        <div class="platform-badge">${esc(game.platform || '—')}</div>
                         <div class="game-overlay">
-                            <p class="game-overlay-text">${game.description || 'Професійна гра для гравців усіх рівнів.'}</p>
+                            <p class="game-overlay-text">${esc(game.description || 'Професійна гра для гравців усіх рівнів.')}</p>
                         </div>
                     </div>
                     <div class="game-info">
-                        <h2 class="game-title">${game.title}</h2>
-                        <div class="game-platform-label">${game.platform || ''}</div>
+                        <h2 class="game-title">${esc(game.title)}</h2>
+                        <div class="game-platform-label">${esc(game.platform || '')}</div>
                         <div class="card-number">#${String(i + 1).padStart(2, '0')}</div>
                     </div>
                 </div>
@@ -1048,10 +1058,10 @@
 
                 adminResults.innerHTML = data.map((g, i) => `
                     <div class="admin-result-card" data-index="${i}">
-                        <img src="${g.image_url}" alt="${g.title}">
+                        <img src="${esc(g.image_url || NO_COVER)}" alt="${esc(g.title)}" ${COVER_FALLBACK}>
                         <div class="admin-result-info">
-                            <div class="title">${g.title}</div>
-                            <div class="plat">${g.platform} · ${g.platformsFull || ''}</div>
+                            <div class="title">${esc(g.title)}</div>
+                            <div class="plat">${esc(g.platform)} · ${esc(g.platformsFull || '')}</div>
                         </div>
                         <div class="admin-result-actions">
                             ${g.exists
@@ -1157,7 +1167,7 @@
         function renderDeleteResults() {
             const q = deleteQueryInput.value.toLowerCase().trim();
             const matches = (q
-                ? allGames.filter(g => g.title.toLowerCase().includes(q))
+                ? allGames.filter(g => (g.title || '').toLowerCase().includes(q))
                 : allGames
             ).slice(0, 30);
 
@@ -1168,10 +1178,10 @@
 
             deleteResults.innerHTML = matches.map(g => `
                 <div class="admin-result-card" data-id="${g.id}">
-                    <img src="${g.image_url || 'images/placeholder.jpg'}" alt="${g.title}" onerror="this.src='images/placeholder.jpg'">
+                    <img src="${esc(g.image_url || NO_COVER)}" alt="${esc(g.title)}" loading="lazy" ${COVER_FALLBACK}>
                     <div class="admin-result-info">
-                        <div class="title">${g.title}</div>
-                        <div class="plat">${g.platform || ''}</div>
+                        <div class="title">${esc(g.title)}</div>
+                        <div class="plat">${esc(g.platform || '')}</div>
                     </div>
                     <div class="admin-result-actions">
                         <button class="admin-btn danger" data-delete-id="${g.id}">Видалити</button>
