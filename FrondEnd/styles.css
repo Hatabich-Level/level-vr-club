@@ -1026,6 +1026,19 @@ footer {
     text-shadow: 0 0 5px var(--cyber-cyan); /* Неоновий текст */
 }
 
+/* Картки в ряд: усе на одному рівні (назва в 1 чи 2 рядки, з вибором гравців чи без) */
+.pricing-cards .card-v2 .btn-add {
+    margin-top: auto;
+}
+@media (min-width: 993px) {
+    .pricing-cards .card-v2 h3 {
+        min-height: 3.2em; /* два рядки при line-height 1.6 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
 /* --- Ціна --- */
 .price-display {
     color: var(--cyber-cyan);
