@@ -625,6 +625,17 @@
 
         .admin-btn.danger:hover { background: rgba(255,60,60,0.18); }
 
+        .admin-result-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+        .admin-edit { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; }
+        .admin-edit textarea {
+            width: 100%; min-height: 130px; box-sizing: border-box; padding: 10px;
+            background: rgba(255,255,255,0.05); border: 1px solid #333; color: #fff;
+            font-family: 'Noto Sans', sans-serif; font-size: 16px; line-height: 1.5; resize: vertical; outline: none;
+        }
+        .admin-edit textarea:focus { border-color: #00F0FF; }
+        .admin-edit-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .admin-edit-count { margin-left: auto; color: #777; font-size: 12px; }
+
         .admin-results {
             margin-top: 18px;
             display: flex;
@@ -786,7 +797,7 @@
 
             <div class="admin-tabs">
                 <button class="admin-tab active" id="tab-add-btn">+ Додати гру</button>
-                <button class="admin-tab" id="tab-delete-btn">🗑 Видалити гру</button>
+                <button class="admin-tab" id="tab-delete-btn">Змінити / видалити</button>
             </div>
 
             <!-- ДОДАВАННЯ -->
@@ -1112,7 +1123,11 @@
                 allGames.unshift(data.game);
                 buildPlatformFiltersIfNeeded(data.game.platform);
                 renderGames();
-                showAdminMsg(`«${game.title}» успішно додано на сайт!`, 'ok');
+                if (data.translated === false) {
+                    showAdminMsg(`«${game.title}» додано. Опис поки англійською: переклад зараз недоступний, сервер спробує ще раз пізніше. Змінити опис можна на вкладці «Змінити / видалити».`, 'exists');
+                } else {
+                    showAdminMsg(`«${game.title}» успішно додано на сайт!`, 'ok');
+                }
                 btnEl.textContent = 'Додано ✓';
             } catch (err) {
                 showAdminMsg('Помилка з\'єднання із сервером', 'err');
@@ -1184,6 +1199,7 @@
                         <div class="plat">${esc(g.platform || '')}</div>
                     </div>
                     <div class="admin-result-actions">
+                        <button class="admin-btn" data-edit-id="${g.id}">Опис</button>
                         <button class="admin-btn danger" data-delete-id="${g.id}">Видалити</button>
                     </div>
                 </div>
@@ -1191,6 +1207,79 @@
 
             deleteResults.querySelectorAll('[data-delete-id]').forEach(btn => {
                 btn.addEventListener('click', () => deleteGameFromSite(Number(btn.dataset.deleteId), btn));
+            });
+            deleteResults.querySelectorAll('[data-edit-id]').forEach(btn => {
+                btn.addEventListener('click', () => openDescriptionEditor(Number(btn.dataset.editId), btn));
+            });
+        }
+
+        /* ===== ЗМІНА ОПИСУ ГРИ ===== */
+        const MAX_DESCRIPTION = 800;
+
+        function openDescriptionEditor(id, btnEl) {
+            const card = btnEl.closest('.admin-result-card');
+            const game = allGames.find(g => g.id === id);
+            if (!card || !game) return;
+            const opened = card.querySelector('.admin-edit');
+            if (opened) { opened.remove(); card.style.flexWrap = ''; return; } // повторне натискання закриває
+
+            // Елементи створюємо без innerHTML: текст опису ніколи не стає розміткою
+            const box = document.createElement('div');
+            box.className = 'admin-edit';
+            const area = document.createElement('textarea');
+            area.maxLength = MAX_DESCRIPTION;
+            area.value = game.description || '';
+            area.setAttribute('aria-label', `Опис гри ${game.title}`);
+            const row = document.createElement('div');
+            row.className = 'admin-edit-row';
+            const save = document.createElement('button');
+            save.type = 'button'; save.className = 'admin-btn'; save.textContent = 'Зберегти';
+            const cancel = document.createElement('button');
+            cancel.type = 'button'; cancel.className = 'admin-btn danger'; cancel.textContent = 'Скасувати';
+            const count = document.createElement('span');
+            count.className = 'admin-edit-count';
+            const updateCount = () => { count.textContent = `${area.value.length} / ${MAX_DESCRIPTION}`; };
+            area.addEventListener('input', updateCount);
+            updateCount();
+            row.append(save, cancel, count);
+            box.append(area, row);
+            card.style.flexWrap = 'wrap';
+            card.appendChild(box);
+            area.focus();
+
+            cancel.addEventListener('click', () => { box.remove(); card.style.flexWrap = ''; });
+            save.addEventListener('click', async () => {
+                const key = adminKeyInput.value.trim();
+                if (!key) return showAdminMsg('Введіть ключ доступу', 'err');
+                const description = area.value.trim();
+                if (!description) return showAdminMsg('Опис не може бути порожнім', 'err');
+
+                save.disabled = true;
+                save.textContent = 'Зберігаємо...';
+                try {
+                    const res = await fetch('/api/games/update-site', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key, id, description })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showAdminMsg(data.error || 'Помилка збереження опису', 'err');
+                        save.disabled = false;
+                        save.textContent = 'Зберегти';
+                        return;
+                    }
+                    sessionStorage.setItem('lvr_admin_key', key);
+                    game.description = data.game.description;
+                    renderGames();
+                    box.remove();
+                    card.style.flexWrap = '';
+                    showAdminMsg(`Опис «${game.title}» збережено.`, 'ok');
+                } catch (err) {
+                    showAdminMsg('Помилка з\'єднання із сервером', 'err');
+                    save.disabled = false;
+                    save.textContent = 'Зберегти';
+                }
             });
         }
 

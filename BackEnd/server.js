@@ -155,6 +155,9 @@ const pool = new Pool({
     );
   `);
   
+  // Скільки разів переклад опису гри не вдався (щоб не пробувати безкінечно)
+  await client.query(`ALTER TABLE games ADD COLUMN IF NOT EXISTS translate_tries INTEGER DEFAULT 0`);
+
   client.release();
 })();
 
@@ -235,6 +238,107 @@ function igdbToGame(game) {
     image_url: game.cover && game.cover.url ? 'https:' + game.cover.url.replace('t_thumb', 't_1080p') : ''
   };
 }
+
+/* ================= ПЕРЕКЛАД ОПИСІВ ІГОР УКРАЇНСЬКОЮ ================= */
+// IGDB віддає описи англійською. Перекладаємо їх безкоштовним сервісом MyMemory:
+// без реєстрації до 5000 символів на добу, з поштою в TRANSLATE_EMAIL до 50000.
+// Якщо переклад недоступний, опис лишається англійською, а фонова задача спробує пізніше.
+const TRANSLATE_EMAIL = (process.env.TRANSLATE_EMAIL || '').trim();
+const TRANSLATE_MAX_TRIES = 3;
+const hasCyrillic = (t) => /[А-Яа-яІіЇїЄєҐґ]/.test(String(t || ''));
+
+const decodeEntities = (t) => String(t)
+  .replace(/&#(\d+);/g, (m, n) => String.fromCodePoint(Number(n)))
+  .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+// Сервіс приймає до 500 байт за запит: ріжемо текст по реченнях, а надто довгі речення по словах
+function splitForTranslate(text, maxBytes = 450) {
+  const bytes = (v) => Buffer.byteLength(v, 'utf8');
+  const parts = [];
+  let cur = '';
+  const push = (piece) => {
+    if (!piece) return;
+    const next = cur ? `${cur} ${piece}` : piece;
+    if (bytes(next) <= maxBytes) { cur = next; return; }
+    if (cur) { parts.push(cur); cur = ''; }
+    if (bytes(piece) <= maxBytes) { cur = piece; return; }
+    for (const word of piece.split(/\s+/)) {
+      const w = bytes(word) > maxBytes ? Buffer.from(word, 'utf8').subarray(0, maxBytes).toString('utf8').replace(/�+$/, '') : word;
+      const n = cur ? `${cur} ${w}` : w;
+      if (bytes(n) <= maxBytes) cur = n; else { parts.push(cur); cur = w; }
+    }
+  };
+  String(text).split(/(?<=[.!?])\s+/).forEach(push);
+  if (cur) parts.push(cur);
+  return parts;
+}
+
+// Повертає { text } або { error: 'skip' | 'unavailable' | 'bad' }
+//  skip        — перекладати нічого (порожньо або вже українською)
+//  unavailable — сервіс не відповів або вичерпано добовий ліміт: варто спробувати пізніше
+//  bad         — сервіс відповів, але українського тексту не дав
+async function translateToUk(text) {
+  const src = String(text || '').trim();
+  if (!src || hasCyrillic(src)) return { error: 'skip' };
+
+  const out = [];
+  for (const part of splitForTranslate(src)) {
+    let data;
+    try {
+      const r = await axios.get('https://api.mymemory.translated.net/get', {
+        params: { q: part, langpair: 'en|uk', ...(TRANSLATE_EMAIL ? { de: TRANSLATE_EMAIL } : {}) },
+        timeout: 8000
+      });
+      data = r.data || {};
+    } catch (e) {
+      return { error: 'unavailable' };
+    }
+    const t = data.responseData && data.responseData.translatedText;
+    if (Number(data.responseStatus) !== 200 || typeof t !== 'string' || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(t)) {
+      return { error: 'unavailable' };
+    }
+    out.push(decodeEntities(t).trim());
+  }
+
+  const joined = out.join(' ').replace(/\s+/g, ' ').trim();
+  if (!joined || !hasCyrillic(joined)) return { error: 'bad' };
+  return { text: joined.slice(0, 800) };
+}
+
+// Фонова задача: потроху перекладає описи ігор, які досі англійською (старі ігри або день без ліміту)
+let translatingGames = false;
+async function translatePendingGames(limit = 5) {
+  if (translatingGames) return { translated: 0, left: null };
+  translatingGames = true;
+  let translated = 0;
+  try {
+    const rows = await pool.query(
+      `SELECT id, description FROM games
+        WHERE COALESCE(description, '') <> '' AND description !~ '[А-Яа-яІіЇїЄєҐґ]' AND COALESCE(translate_tries, 0) < $1
+        ORDER BY id DESC LIMIT $2`,
+      [TRANSLATE_MAX_TRIES, limit]
+    );
+    for (const g of rows.rows) {
+      const r = await translateToUk(g.description);
+      if (r.text) {
+        // опис міг змінитися, поки ми перекладали: оновлюємо лише якщо він той самий
+        const u = await pool.query('UPDATE games SET description = $1 WHERE id = $2 AND description = $3', [r.text, g.id, g.description]);
+        translated += u.rowCount;
+      } else if (r.error === 'unavailable') {
+        break; // ліміт або збій сервісу: наступна спроба за годину
+      } else {
+        await pool.query('UPDATE games SET translate_tries = COALESCE(translate_tries, 0) + 1 WHERE id = $1', [g.id]);
+      }
+    }
+  } catch (e) {
+    console.error('Помилка перекладу описів ігор:', e.message);
+  } finally {
+    translatingGames = false;
+  }
+  return { translated };
+}
+cron.schedule('17 * * * *', () => { translatePendingGames(); });
+setTimeout(() => { translatePendingGames(); }, 60 * 1000).unref(); // і одразу після запуску сервера
 
 /* ================= ONLINE ================= */
 let onlineUsers = 0;
@@ -1236,11 +1340,13 @@ bot.on('callback_query', async (query) => {
       } else if (await gameExistsByTitle(pending.title)) {
         await edit(`⚠️ Гра "${pending.title}" вже є в каталозі. Пропущено.`);
       } else {
+        const tr = await translateToUk(pending.description);
         await pool.query(
           'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4)',
-          [pending.title, pending.platform, pending.description, pending.image_url]
+          [pending.title, pending.platform, tr.text || pending.description, pending.image_url]
         );
-        await edit(`✅ Гру "${pending.title}" додано на сайт!`);
+        await edit(`✅ Гру "${pending.title}" додано на сайт!` +
+          (tr.text || tr.error === 'skip' ? '' : '\n\nОпис поки англійською: переклад зараз недоступний, сервер спробує ще раз пізніше.'));
       }
       return ack();
     }
@@ -1833,19 +1939,53 @@ app.post('/api/games/add-site', async (req, res) => {
       return res.status(409).json({ error: 'Ця гра вже є в каталозі' });
     }
 
+    const description = clean(game.description, 800);
+    const tr = await translateToUk(description);
+
     const result = await pool.query(
       'INSERT INTO games (title, platform, description, image_url) VALUES ($1, $2, $3, $4) RETURNING *',
-      [title, clean(game.platform, 40) || 'Console', clean(game.description, 600), imageUrl]
+      [title, clean(game.platform, 40) || 'Console', tr.text || description, imageUrl]
     );
 
     if (ADMIN_CHAT_ID) {
       bot.sendMessage(ADMIN_CHAT_ID, `🎮 Гру "${title}" додано через сайт (без Telegram).`).catch(() => {});
     }
 
-    res.json({ success: true, game: result.rows[0] });
+    // translated: false = опис лишився англійською (сервер спробує перекласти пізніше)
+    res.json({ success: true, game: result.rows[0], translated: !!tr.text || tr.error === 'skip' });
   } catch (err) {
     console.error('Помилка додавання гри (сайт):', err.message);
     res.status(500).json({ error: 'Помилка додавання гри' });
+  }
+});
+
+// Зміна опису гри вручну (наприклад, щоб поправити автоматичний переклад)
+app.post('/api/games/update-site', async (req, res) => {
+  const body = siteAdminBody(req, res);
+  if (!body) return;
+
+  const id = Number(body.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Немає id гри' });
+  }
+  const description = String(body.description ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800);
+  if (!description) {
+    return res.status(400).json({ error: 'Опис не може бути порожнім' });
+  }
+
+  try {
+    // translate_tries на максимум: текст, який написав адмін, автоматичний переклад більше не чіпає
+    const result = await pool.query(
+      'UPDATE games SET description = $1, translate_tries = $2 WHERE id = $3 RETURNING *',
+      [description, TRANSLATE_MAX_TRIES, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Гру не знайдено' });
+    }
+    res.json({ success: true, game: result.rows[0] });
+  } catch (err) {
+    console.error('Помилка зміни опису (сайт):', err.message);
+    res.status(500).json({ error: 'Помилка збереження опису' });
   }
 });
 
