@@ -1900,7 +1900,7 @@ html, body {
     }
 
     /* Логотип */
-    .logo { margin-left: 20px !important; margin-top: 20px; }
+    .logo { margin-left: 20px !important; }
     .svg-logo { height: 40px; width: auto; }
 
     /* Головний текст */
@@ -1983,7 +1983,7 @@ html, body {
         margin-right: 0;
     }
     
-    .cart-trigger { margin: 20px 0 0 0; }
+    .cart-trigger { margin: 0; }
 
     /* 3. СЕКЦІЯ "ПРО НАС" */
     .about-cards {
