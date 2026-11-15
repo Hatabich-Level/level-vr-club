@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" role="img" aria-label="Немає обкладинки">
+  <rect width="300" height="400" fill="#0b1216"/>
+  <rect x="1" y="1" width="298" height="398" fill="none" stroke="#00f0ff" stroke-opacity=".35" stroke-width="2"/>
+  <g fill="none" stroke="#00f0ff" stroke-opacity=".7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="95" y="160" width="110" height="64" rx="30"/>
+    <path d="M122 192h20M132 182v20"/>
+    <path d="M170 186h.01M184 198h.01" stroke-width="9"/>
+  </g>
+  <text x="150" y="270" fill="#a9b4bc" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" letter-spacing="2">НЕМАЄ ОБКЛАДИНКИ</text>
+</svg>
