@@ -3708,10 +3708,6 @@ img, video, svg {
     white-space: nowrap;
 }
 
-.menu a:last-child {
-    margin-right: 0;
-}
-
 .menu a:hover {
     color: #00CACA;
 }
