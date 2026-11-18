@@ -680,10 +680,12 @@ async function refreshBonusBox(force) {
   } catch (e) { return hide(); }
 
   const total = Number(totalPrice) || 0;
+  const pts = (n) => { const a = Math.abs(n) % 100, b = a % 10; return `${n} ${a > 10 && a < 20 ? 'балів' : b === 1 ? 'бал' : b >= 2 && b <= 4 ? 'бали' : 'балів'}`; };
   const canUse = Math.max(0, Math.min(bonusInfo.balance, Math.floor(total * bonusInfo.maxShare / 100)));
   const prev = document.getElementById('bonus-use');
   const checked = prev ? prev.checked : true;
   box.textContent = '';
+  box.classList.toggle('mini', canUse <= 0);
   const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 
   let use = 0;
@@ -694,18 +696,17 @@ async function refreshBonusBox(force) {
     const txt = mk('span');
     txt.append('Оплатити балами ', mk('b', '', `−${canUse} грн`));
     txt.appendChild(document.createElement('br'));
-    txt.append(`У тебе ${bonusInfo.balance} балів. Балами можна оплатити до ${bonusInfo.maxShare}% суми.`);
+    txt.append(`У тебе ${pts(bonusInfo.balance)}. Балами можна оплатити до ${bonusInfo.maxShare}% суми.`);
     label.append(cb, txt);
     box.appendChild(label);
     use = cb.checked ? canUse : 0;
     const line = mk('div', 'bonus-line');
     line.append(mk('span', '', 'До сплати в клубі'), mk('span', '', `${total - use} грн`));
     box.appendChild(line);
-  } else {
-    box.appendChild(mk('div', '', bonusInfo.balance > 0 ? `У тебе ${bonusInfo.balance} балів.` : 'Бонусні бали: поки 0.'));
   }
   const earn = Math.floor((total - use) * bonusInfo.percent / 100);
-  if (earn > 0) box.appendChild(mk('div', 'bonus-earn', `За цю гру повернеться +${earn} балів (після візиту)`));
+  if (earn > 0) box.appendChild(mk('div', 'bonus-earn', `🎁 За цю гру повернеться +${pts(earn)} після візиту`));
+  if (!box.childNodes.length) return hide();
   box.hidden = false;
 }
 
