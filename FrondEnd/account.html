@@ -766,12 +766,14 @@
                 // адмін, який відкрив свій кабінет клієнта, має швидко повернутись у панель
                 let back = $('acc-to-admin');
                 if (user.isAdmin && !back) {
+                    // Окремим рядком під шапкою, щоб цифри справа стояли на рівні з «Вхід через ...»
+                    const row = el('div');
+                    row.style.flex = '1 1 100%';
                     back = el('a', 'adm-switch', '← Адмін-панель');
                     back.id = 'acc-to-admin';
                     back.href = 'account.html';
-                    back.style.alignSelf = 'flex-start';
-                    back.style.marginTop = '8px';
-                    $('acc-who').after(back);
+                    row.appendChild(back);
+                    document.querySelector('#acc-cabinet .acc-hero').appendChild(row);
                 }
                 $('acc-name').value = user.name || '';
                 $('acc-phone').value = user.phone || '';
