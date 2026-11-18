@@ -149,6 +149,23 @@
             .adm-c span{font-size:13px;color:#A9B4BC}
             .adm-c i{font-style:normal;text-align:right;font-size:13px;color:#00F0FF;white-space:nowrap}
             .adm-more{align-self:center}
+            .adm-sub{margin:8px 0 -2px;font-size:13px;letter-spacing:3px;color:#00F0FF;text-transform:uppercase;font-weight:600}
+            .adm-games{display:flex;flex-direction:column;gap:10px}
+            .adm-game{background:#0B1216;border:1px solid #1B2A30;padding:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+            .adm-game img{width:56px;height:74px;object-fit:cover;flex:0 0 56px;background:#070A0D;border:1px solid #1B2A30}
+            .adm-game-info{flex:1 1 160px;min-width:0;display:flex;flex-direction:column;gap:4px}
+            .adm-game-info strong{color:#fff;font-size:15px;overflow-wrap:anywhere}
+            .adm-game-info span{font-size:12px;color:#A9B4BC;overflow-wrap:anywhere}
+            .adm-game-info p{margin:0;font-size:13px;color:#ccc;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+            .adm-game-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+            .adm-game .adm-form{flex-direction:column;align-items:stretch}
+            .adm-game textarea{width:100%;min-height:120px;box-sizing:border-box;padding:10px 12px;background:#0B1216;border:1px solid #2A3A42;color:#ddd;font:15px/1.5 'Noto Sans',sans-serif;resize:vertical}
+            .adm-game textarea:focus{border-color:#00F0FF;outline:none}
+            .adm-count{color:#6b767d;font-size:12px;margin-left:auto}
+            .adm-has{font-size:12px;color:#FFC857;letter-spacing:1px}
+            #adm-g-msg:empty{display:none}
+            .adm-filters .adm-btn{min-height:44px}
+            @media (max-width:600px){ .adm-game-acts{flex:1 1 100%} .adm-game-acts .adm-btn{flex:1 1 auto;justify-content:center} }
             @media (max-width:600px){
                 .adm-stats{grid-template-columns:1fr 1fr;gap:10px}
                 .adm-stat{padding:14px}
@@ -303,6 +320,7 @@
                     <div class="acc-tabs" role="tablist" aria-label="Адмін-панель">
                         <button type="button" class="acc-tab" role="tab" id="adm-tab-b" aria-controls="adm-bookings" aria-selected="true">Бронювання</button>
                         <button type="button" class="acc-tab" role="tab" id="adm-tab-c" aria-controls="adm-clients" aria-selected="false">Клієнти</button>
+                        <button type="button" class="acc-tab" role="tab" id="adm-tab-g" aria-controls="adm-games" aria-selected="false">Ігри</button>
                     </div>
                     <div class="acc-list" id="adm-bookings" role="tabpanel" aria-labelledby="adm-tab-b"></div>
                     <div class="acc-list" id="adm-clients" role="tabpanel" aria-labelledby="adm-tab-c" hidden>
@@ -311,6 +329,20 @@
                         </div>
                         <div class="adm-filters" id="adm-pills"></div>
                         <div id="adm-clients-list" class="acc-list"></div>
+                    </div>
+                    <div class="acc-list" id="adm-games" role="tabpanel" aria-labelledby="adm-tab-g" hidden>
+                        <div class="adm-sub">Додати гру</div>
+                        <form class="adm-filters" id="adm-g-search-form">
+                            <input type="search" id="adm-g-query" placeholder="Назва гри, напр. UFC 5" aria-label="Назва гри для пошуку" maxlength="100" autocomplete="off">
+                            <button type="submit" class="adm-btn ok" id="adm-g-search-btn">Знайти</button>
+                        </form>
+                        <p class="acc-msg" id="adm-g-msg" role="status"></p>
+                        <div class="adm-games" id="adm-g-found"></div>
+                        <div class="adm-sub" id="adm-g-cat-title">Каталог</div>
+                        <div class="adm-filters">
+                            <input type="search" id="adm-g-filter" placeholder="Пошук у каталозі" aria-label="Пошук у каталозі">
+                        </div>
+                        <div class="adm-games" id="adm-g-list"></div>
                     </div>
                 </div>
 
@@ -1076,16 +1108,198 @@
                 }
             }
 
+
+            /* --- ігри (каталог на сторінці «Ігри») --- */
+            const NO_COVER = 'images/placeholder.svg';
+            const games = { list: null, shown: 30 };
+            const gameErr = (r) => (r && r.data && (r.data.error || r.data.message)) || 'Не вдалося.';
+            function cover(src, alt) {
+                const img = el('img');
+                img.src = /^https:\/\//i.test(src || '') ? src : NO_COVER;
+                img.alt = alt || '';
+                img.loading = 'lazy';
+                img.addEventListener('error', () => { img.src = NO_COVER; }, { once: true });
+                return img;
+            }
+            async function gameApi(path, body) {
+                const r = await api(path, { method: 'POST', body });
+                if (r.status === 401) { LevelAuth.setToken(''); showLogin('Сесія закінчилась. Увійдіть ще раз.'); return null; }
+                return r;
+            }
+            async function loadGames() {
+                const box = $('adm-g-list');
+                box.textContent = '';
+                box.appendChild(el('p', 'acc-empty', 'Завантаження...'));
+                try {
+                    const r = await api('/api/games', { guest: true });
+                    if (!Array.isArray(r.data)) throw new Error('server');
+                    games.list = r.data;
+                    renderCatalog();
+                } catch (e) {
+                    box.textContent = '';
+                    box.appendChild(el('p', 'acc-empty', 'Не вдалося завантажити каталог. Оновіть сторінку.'));
+                }
+            }
+            function renderCatalog() {
+                const box = $('adm-g-list');
+                box.textContent = '';
+                if (!games.list) return;
+                $('adm-g-cat-title').textContent = `Каталог · ${games.list.length}`;
+                const q = $('adm-g-filter').value.trim().toLowerCase();
+                const found = games.list.filter((g) => !q || String(g.title || '').toLowerCase().includes(q));
+                if (!found.length) { box.appendChild(el('p', 'acc-empty', games.list.length ? 'Нічого не знайдено.' : 'Каталог порожній.')); return; }
+                found.slice(0, games.shown).forEach((g) => box.appendChild(catalogCard(g)));
+                if (found.length > games.shown) {
+                    const more = el('button', 'adm-btn adm-more', `Показати ще (${found.length - games.shown})`);
+                    more.type = 'button';
+                    more.addEventListener('click', () => { games.shown += 30; renderCatalog(); });
+                    box.appendChild(more);
+                }
+            }
+            function catalogCard(g) {
+                const card = el('article', 'adm-game');
+                card.appendChild(cover(g.image_url, g.title));
+                const info = el('div', 'adm-game-info');
+                info.appendChild(el('strong', '', g.title || 'Без назви'));
+                if (g.platform) info.appendChild(el('span', '', g.platform));
+                const desc = el('p', '', g.description || '');
+                info.appendChild(desc);
+                card.appendChild(info);
+                const acts = el('div', 'adm-game-acts');
+                const form = el('div', 'adm-form');
+                form.hidden = true;
+                const msg = el('p', 'acc-msg');
+                msg.setAttribute('role', 'status');
+                const edit = el('button', 'adm-btn', 'Опис'); edit.type = 'button';
+                const del = el('button', 'adm-btn no', 'Видалити'); del.type = 'button';
+                acts.appendChild(edit);
+                acts.appendChild(del);
+                card.appendChild(acts);
+                card.appendChild(form);
+
+                edit.addEventListener('click', () => {
+                    if (!form.hidden && form.dataset.mode === 'edit') { form.hidden = true; return; }
+                    form.hidden = false; form.dataset.mode = 'edit'; form.textContent = '';
+                    const area = el('textarea');
+                    area.maxLength = 800;
+                    area.value = g.description || '';
+                    area.setAttribute('aria-label', 'Опис гри ' + (g.title || ''));
+                    const row = el('div', 'adm-row');
+                    const save = el('button', 'adm-btn ok', 'Зберегти'); save.type = 'button';
+                    const close = el('button', 'adm-btn', 'Закрити'); close.type = 'button';
+                    const count = el('span', 'adm-count');
+                    const upd = () => { count.textContent = `${area.value.length} / 800`; };
+                    area.addEventListener('input', upd); upd();
+                    row.append(save, close, count);
+                    form.append(area, row, msg);
+                    setMsgEl(msg, '');
+                    area.focus();
+                    close.addEventListener('click', () => { form.hidden = true; });
+                    save.addEventListener('click', async () => {
+                        if (!area.value.trim()) { setMsgEl(msg, 'Опис не може бути порожнім.'); return; }
+                        save.disabled = true; setMsgEl(msg, 'Зберігаємо...');
+                        try {
+                            const r = await gameApi('/api/games/update-site', { id: g.id, description: area.value });
+                            if (!r) return;
+                            if (r.status !== 200) { setMsgEl(msg, gameErr(r)); return; }
+                            g.description = r.data.game.description;
+                            desc.textContent = g.description;
+                            setMsgEl(msg, 'Збережено.', true);
+                            setTimeout(() => { form.hidden = true; }, 900);
+                        } catch (e) { setMsgEl(msg, NO_NET); } finally { save.disabled = false; }
+                    });
+                });
+                del.addEventListener('click', () => {
+                    form.hidden = false; form.dataset.mode = 'del'; form.textContent = '';
+                    const row = el('div', 'adm-row');
+                    const yes = el('button', 'adm-btn no', 'Так, видалити'); yes.type = 'button';
+                    const no = el('button', 'adm-btn', 'Ні'); no.type = 'button';
+                    row.append(yes, no);
+                    form.append(el('p', 'acc-hint', `Видалити «${g.title}» з каталогу? Повернути можна лише додавши знову.`), row, msg);
+                    setMsgEl(msg, '');
+                    no.addEventListener('click', () => { form.hidden = true; });
+                    yes.addEventListener('click', async () => {
+                        yes.disabled = true; setMsgEl(msg, 'Видаляємо...');
+                        try {
+                            const r = await gameApi('/api/games/delete-site', { id: g.id });
+                            if (!r) return;
+                            if (r.status !== 200 && r.status !== 404) { setMsgEl(msg, gameErr(r)); return; }
+                            games.list = games.list.filter((x) => x.id !== g.id);
+                            renderCatalog();
+                            setMsgEl($('adm-g-msg'), `«${g.title}» видалено з каталогу.`, true);
+                        } catch (e) { setMsgEl(msg, NO_NET); } finally { yes.disabled = false; }
+                    });
+                });
+                return card;
+            }
+            $('adm-g-filter').addEventListener('input', () => { games.shown = 30; renderCatalog(); });
+
+            $('adm-g-search-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const query = $('adm-g-query').value.trim();
+                const found = $('adm-g-found');
+                const msg = $('adm-g-msg');
+                const btn = $('adm-g-search-btn');
+                if (!query) { setMsgEl(msg, 'Введіть назву гри.'); $('adm-g-query').focus(); return; }
+                found.textContent = '';
+                btn.disabled = true; btn.textContent = 'Пошук...';
+                setMsgEl(msg, 'Шукаємо в базі ігор...');
+                try {
+                    const r = await gameApi('/api/games/search-site', { query });
+                    if (!r) return;
+                    if (r.status !== 200 || !Array.isArray(r.data)) { setMsgEl(msg, gameErr(r)); return; }
+                    if (!r.data.length) { setMsgEl(msg, 'Нічого не знайдено. Спробуйте назву англійською або коротше.'); return; }
+                    setMsgEl(msg, `Знайдено: ${r.data.length}. Оберіть потрібну гру.`, true);
+                    r.data.forEach((g) => {
+                        const card = el('article', 'adm-game');
+                        card.appendChild(cover(g.image_url, g.title));
+                        const info = el('div', 'adm-game-info');
+                        info.appendChild(el('strong', '', g.title));
+                        info.appendChild(el('span', '', [g.platform, g.platformsFull].filter(Boolean).join(' · ')));
+                        if (g.description) info.appendChild(el('p', '', g.description));
+                        card.appendChild(info);
+                        const acts = el('div', 'adm-game-acts');
+                        if (g.exists) {
+                            acts.appendChild(el('span', 'adm-has', 'Вже є в каталозі'));
+                        } else {
+                            const add = el('button', 'adm-btn ok', 'Додати'); add.type = 'button';
+                            add.addEventListener('click', async () => {
+                                add.disabled = true; add.textContent = 'Додаємо...';
+                                try {
+                                    const res = await gameApi('/api/games/add-site', { game: g });
+                                    if (!res) return;
+                                    if (res.status === 409) { add.replaceWith(el('span', 'adm-has', 'Вже є в каталозі')); return; }
+                                    if (res.status !== 200) { setMsgEl(msg, gameErr(res)); add.disabled = false; add.textContent = 'Додати'; return; }
+                                    add.replaceWith(el('span', 'adm-has', 'Додано ✓'));
+                                    if (games.list) { games.list.unshift(res.data.game); renderCatalog(); }
+                                    setMsgEl(msg, res.data.translated === false
+                                        ? `«${g.title}» додано. Опис поки англійською — сервер перекладе пізніше, або змініть його в каталозі нижче («Опис»).`
+                                        : `«${g.title}» додано на сайт.`, true);
+                                } catch (err) { setMsgEl(msg, NO_NET); add.disabled = false; add.textContent = 'Додати'; }
+                            });
+                            acts.appendChild(add);
+                        }
+                        card.appendChild(acts);
+                        found.appendChild(card);
+                    });
+                } catch (err) {
+                    setMsgEl(msg, NO_NET);
+                } finally {
+                    btn.disabled = false; btn.textContent = 'Знайти';
+                }
+            });
+
             function selectAdmTab(which) {
-                const c = which === 'c';
-                $('adm-tab-b').setAttribute('aria-selected', String(!c));
-                $('adm-tab-c').setAttribute('aria-selected', String(c));
-                show('adm-bookings', !c);
-                show('adm-clients', c);
-                if (c && !adm.clients) loadClients();
+                [['b', 'adm-bookings'], ['c', 'adm-clients'], ['g', 'adm-games']].forEach(([k, id]) => {
+                    $('adm-tab-' + k).setAttribute('aria-selected', String(which === k));
+                    show(id, which === k);
+                });
+                if (which === 'c' && !adm.clients) loadClients();
+                if (which === 'g' && !games.list) loadGames();
             }
             $('adm-tab-b').addEventListener('click', () => selectAdmTab('b'));
             $('adm-tab-c').addEventListener('click', () => selectAdmTab('c'));
+            $('adm-tab-g').addEventListener('click', () => selectAdmTab('g'));
 
             function showAdmin(user) {
                 adm.user = user;

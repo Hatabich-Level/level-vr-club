@@ -1886,11 +1886,27 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 
-// Повертає тіло запиту, якщо ключ вірний; інакше сам відповідає помилкою і повертає null
-function siteAdminBody(req, res) {
+// Повертає тіло запиту, якщо це адмін (увійшов на сайті) або ключ вірний;
+// інакше сам відповідає помилкою і повертає null
+async function siteAdminBody(req, res) {
   if (!isAllowedOrigin(req.headers.origin)) {
     res.status(403).json({ error: 'Заборонено' });
     return null;
+  }
+
+  // Адмін, що увійшов через Telegram/Google, ключа не вводить
+  if (req.headers.authorization) {
+    try {
+      const account = await accountFromRequest(req);
+      if (account && isSiteAdmin(account.user)) {
+        req.siteAdmin = account.user;
+        return req.body && typeof req.body === 'object' ? req.body : {};
+      }
+    } catch (e) {
+      console.error('Перевірка адміна (ігри):', e.message);
+      res.status(500).json({ error: 'Помилка сервера' });
+      return null;
+    }
   }
 
   const ip = clientIp(req);
@@ -1917,7 +1933,7 @@ function siteAdminBody(req, res) {
 
 // Пошук ігор у IGDB прямо з сайту (повертає кілька варіантів на вибір)
 app.post('/api/games/search-site', async (req, res) => {
-  const body = siteAdminBody(req, res);
+  const body = await siteAdminBody(req, res);
   if (!body) return;
 
   const query = String(body.query || '').trim().slice(0, 100);
@@ -1941,7 +1957,7 @@ app.post('/api/games/search-site', async (req, res) => {
 
 // Додавання обраної гри з сайту (з повторною перевіркою дублікатів)
 app.post('/api/games/add-site', async (req, res) => {
-  const body = siteAdminBody(req, res);
+  const body = await siteAdminBody(req, res);
   if (!body) return;
 
   const game = body.game && typeof body.game === 'object' ? body.game : {};
@@ -1970,7 +1986,7 @@ app.post('/api/games/add-site', async (req, res) => {
     );
 
     if (ADMIN_CHAT_ID) {
-      bot.sendMessage(ADMIN_CHAT_ID, `🎮 Гру "${title}" додано через сайт (без Telegram).`).catch(() => {});
+      bot.sendMessage(ADMIN_CHAT_ID, `🎮 Гру "${title}" додано через сайт${req.siteAdmin ? ' — ' + adminWho({ user: req.siteAdmin }) : ''}.`).catch(() => {});
     }
 
     // translated: false = опис лишився англійською (сервер спробує перекласти пізніше)
@@ -1983,7 +1999,7 @@ app.post('/api/games/add-site', async (req, res) => {
 
 // Зміна опису гри вручну (наприклад, щоб поправити автоматичний переклад)
 app.post('/api/games/update-site', async (req, res) => {
-  const body = siteAdminBody(req, res);
+  const body = await siteAdminBody(req, res);
   if (!body) return;
 
   const id = Number(body.id);
@@ -2013,7 +2029,7 @@ app.post('/api/games/update-site', async (req, res) => {
 
 // Видалення гри з каталогу через сайт
 app.post('/api/games/delete-site', async (req, res) => {
-  const body = siteAdminBody(req, res);
+  const body = await siteAdminBody(req, res);
   if (!body) return;
 
   const id = Number(body.id);
@@ -2029,7 +2045,7 @@ app.post('/api/games/delete-site', async (req, res) => {
     }
 
     if (ADMIN_CHAT_ID) {
-      bot.sendMessage(ADMIN_CHAT_ID, `🗑 Гру "${result.rows[0].title}" видалено через сайт.`).catch(() => {});
+      bot.sendMessage(ADMIN_CHAT_ID, `🗑 Гру "${result.rows[0].title}" видалено через сайт${req.siteAdmin ? ' — ' + adminWho({ user: req.siteAdmin }) : ''}.`).catch(() => {});
     }
 
     res.json({ success: true, game: result.rows[0] });
