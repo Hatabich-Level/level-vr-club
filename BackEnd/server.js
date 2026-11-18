@@ -142,6 +142,28 @@ const pool = new Pool({
   await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS user_id INTEGER`);
   await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS confirmed BOOLEAN DEFAULT FALSE`);
   await client.query(`CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings (user_id)`);
+  // Бонуси і запрошення друзів
+  await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ref_code TEXT UNIQUE`);
+  await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER`);
+  await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_state TEXT`);
+  await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_warned_at TIMESTAMP`);
+  await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS bonus_used INTEGER DEFAULT 0`);
+  // Старі бронювання лишаються з NULL: бали за візити до запуску бонусів не нараховуються
+  await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS bonus_state TEXT`);
+  await client.query(`ALTER TABLE bookings ALTER COLUMN bonus_state SET DEFAULT 'new'`);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS bonus_tx (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      amount INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      booking_id INTEGER,
+      note TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_bonus_tx_user ON bonus_tx (user_id)`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users (referred_by)`);
   // Нотатки адміна про клієнта (клієнт = останні 9 цифр телефону)
   await client.query(`
     CREATE TABLE IF NOT EXISTS client_notes (
@@ -398,6 +420,9 @@ bot.onText(/\/start(?: (.*))?/, async (msg, match) => {
 /* ================= ADMIN COMMANDS ================= */
 bot.onText(/^\/clear(?:@\w+)?\s*$/i, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
+  // Бали, списані на ігри, які ще не відбулися, повертаємо клієнтам
+  const withBonus = await pool.query(`SELECT * FROM bookings WHERE bonus_used > 0 AND bonus_state = 'new'`);
+  for (const b of withBonus.rows) await refundBookingBonus(b);
   await pool.query('TRUNCATE bookings RESTART IDENTITY');
   bot.sendMessage(msg.chat.id, '🧹 Базу очищено');
 });
@@ -1112,7 +1137,7 @@ app.get('/api/me/bookings', async (req, res) => {
     if (!account) return;
 
     const r = await pool.query(
-      `SELECT id, booking_date, booking_time, total_price, cart_details, confirmed
+      `SELECT id, booking_date, booking_time, total_price, cart_details, confirmed, bonus_used
          FROM bookings WHERE user_id = $1
         ORDER BY booking_date DESC, booking_time DESC LIMIT 100`,
       [account.user.id]
@@ -1132,7 +1157,7 @@ app.get('/api/me/bookings', async (req, res) => {
       const isPast = b.booking_date < today.date || (b.booking_date === today.date && endMin <= today.min);
       (isPast ? past : upcoming).push({
         id: b.id, date: b.booking_date, time: b.booking_time,
-        total: Number(b.total_price) || 0, confirmed: !!b.confirmed, items
+        total: Number(b.total_price) || 0, confirmed: !!b.confirmed, items, bonusUsed: Number(b.bonus_used) || 0
       });
     }
     upcoming.reverse(); // найближчі зверху
@@ -1245,6 +1270,9 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
     //    нагадувань береться з акаунта (перевірений входом), тож посилання на бота вже не потрібне.
     const account = await accountFromRequest(req).catch(() => null);
     const accountChatId = account && account.user.telegram_id ? account.user.telegram_id : null;
+    // Оплата балами: лише з акаунтом і не для дня народження (там своя ціна, бонусів немає)
+    const wantsBonus = body.useBonus === true && !!account && !isBirthdayCart(cart);
+    let bonusUsed = 0;
 
     const claimToken = crypto.randomBytes(8).toString('hex');
     const db = await pool.connect();
@@ -1262,12 +1290,22 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
         });
       }
 
+      if (wantsBonus) {
+        // Блокуємо рядок клієнта: два одночасні бронювання не спишуть ті самі бали двічі
+        await db.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [account.user.id]);
+        const balance = await bonusBalance(db, account.user.id);
+        bonusUsed = Math.max(0, Math.min(balance, Math.floor(total * BONUS.maxShare / 100)));
+      }
+
       const dbRes = await db.query(
-        `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, claim_token, user_id, client_chat_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-        [name, phone, date, time, total, JSON.stringify(cart), comment, claimToken, account ? account.user.id : null, accountChatId]
+        `INSERT INTO bookings (name, phone, booking_date, booking_time, total_price, cart_details, comment, claim_token, user_id, client_chat_id, bonus_used)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [name, phone, date, time, total, JSON.stringify(cart), comment, claimToken, account ? account.user.id : null, accountChatId, bonusUsed]
       );
       newId = dbRes.rows[0].id;
+      if (bonusUsed > 0) {
+        await addBonusTx(db, account.user.id, -bonusUsed, 'spend', newId, `Оплата бронювання на ${fmtDate(date).slice(0, 5)}`);
+      }
       await db.query('COMMIT');
     } catch (e) {
       try { await db.query('ROLLBACK'); } catch (_) { /* вже відкочено */ }
@@ -1294,6 +1332,7 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
     });
 
     tgMsg += `\n💰 <b>ЗАГАЛОМ: ${escapeHtml(total)} грн</b>`;
+    if (bonusUsed > 0) tgMsg += `\n🎁 <b>Оплачено балами:</b> ${bonusUsed} грн\n💵 <b>До сплати в клубі: ${total - bonusUsed} грн</b>`;
     if (comment !== 'Немає') tgMsg += `\n\n💬 <b>Коментар:</b> <i>${escapeHtml(comment)}</i>`;
     tgMsg += `\n\n⏳ <b>СТАТУС: ОЧІКУЄ ПІДТВЕРДЖЕННЯ</b>`;
 
@@ -1308,7 +1347,7 @@ app.post('/api/book', bookBurstLimit, bookDailyLimit, async (req, res) => {
       console.error(`Не вдалося сповістити адміна про замовлення #${newId}:`, e.message);
     }
 
-    res.json({ success: true, orderId: newId, claimToken, botLinked: !!accountChatId });
+    res.json({ success: true, orderId: newId, claimToken, botLinked: !!accountChatId, bonusUsed, toPay: total - bonusUsed });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: `Помилка сервера. Спробуйте пізніше. ${CALL_US}` });
@@ -1441,11 +1480,12 @@ bot.on('message', async (msg) => {
   delete cancelReasons[adminId];
 
   try {
-    const res = await pool.query('DELETE FROM bookings WHERE id=$1 RETURNING client_chat_id', [id]);
+    const res = await pool.query('DELETE FROM bookings WHERE id=$1 RETURNING *', [id]);
     if (!res.rows.length) {
       await bot.sendMessage(adminId, `ℹ️ Замовлення #${id} вже видалено раніше.`);
       return;
     }
+    await refundBookingBonus(res.rows[0]);
 
     if (res.rows[0].client_chat_id) {
       await bot.sendMessage(res.rows[0].client_chat_id, `❌ Замовлення #${id} скасовано\nПричина: ${reason}`)
@@ -2095,7 +2135,8 @@ function adminBooking(b) {
     date: b.booking_date, time: b.booking_time, total: Number(b.total_price) || 0,
     confirmed: !!b.confirmed, comment: b.comment && b.comment !== 'Немає' ? b.comment : '',
     items: parseCart(b.cart_details), botLinked: !!b.client_chat_id,
-    username: b.username || '', source: b.telegram_id ? 'tg' : (b.google_sub ? 'google' : '')
+    username: b.username || '', source: b.telegram_id ? 'tg' : (b.google_sub ? 'google' : ''),
+    bonusUsed: Number(b.bonus_used) || 0, bonusState: b.bonus_state || '', hasAccount: !!b.user_id
   };
 }
 
@@ -2105,11 +2146,13 @@ app.get('/api/admin/overview', async (req, res) => {
     const today = kyivToday().date;
     const month = today.slice(0, 7);
     const [list, stats] = await Promise.all([
+      // + вчорашні підтверджені ігри клієнтів з акаунтом: до нарахування балів ще можна позначити «Не прийшов»
       pool.query(
         `SELECT b.*, u.username, u.telegram_id, u.google_sub
            FROM bookings b LEFT JOIN users u ON u.id = b.user_id
           WHERE b.booking_date >= $1
-          ORDER BY b.booking_date, b.booking_time, b.id LIMIT 300`, [today]),
+             OR (b.booking_date = $2 AND b.user_id IS NOT NULL AND b.bonus_state = 'new' AND COALESCE(b.confirmed, FALSE))
+          ORDER BY b.booking_date, b.booking_time, b.id LIMIT 300`, [today, shiftDate(today, -1)]),
       pool.query(
         `SELECT
            COUNT(*) FILTER (WHERE booking_date = $1)::int AS today,
@@ -2147,7 +2190,8 @@ app.get('/api/admin/clients', async (req, res) => {
                 MAX(user_id) AS user_id
            FROM bookings GROUP BY 1
        )
-       SELECT c.*, u.username, u.telegram_id, u.google_sub, n.note
+       SELECT c.*, u.username, u.telegram_id, u.google_sub, n.note,
+              (SELECT COALESCE(SUM(amount), 0) FROM bonus_tx t WHERE t.user_id = c.user_id)::int AS bonus
          FROM c LEFT JOIN users u ON u.id = c.user_id
                 LEFT JOIN client_notes n ON n.phone_tail = c.tail
         WHERE c.tail <> ''
@@ -2158,7 +2202,7 @@ app.get('/api/admin/clients', async (req, res) => {
         tail: c.tail, name: c.name || '', phone: c.phone || '', visits: c.visits, upcoming: c.upcoming,
         spent: Math.round(c.spent), first: c.first_date, last: c.last_date || '',
         username: c.username || '', source: c.telegram_id ? 'tg' : (c.google_sub ? 'google' : ''),
-        note: c.note || ''
+        note: c.note || '', bonus: c.user_id ? c.bonus : null
       }))
     });
   } catch (e) {
@@ -2180,7 +2224,16 @@ app.get('/api/admin/client', async (req, res) => {
           ORDER BY b.booking_date DESC, b.booking_time DESC LIMIT 200`, [tail]),
       pool.query('SELECT note FROM client_notes WHERE phone_tail = $1', [tail])
     ]);
-    res.json({ success: true, bookings: list.rows.map(adminBooking), note: note.rows[0] ? note.rows[0].note : '' });
+    const userId = (list.rows.find((b) => b.user_id) || {}).user_id || null;
+    let bonus = null;
+    if (userId) {
+      const [bal, tx] = await Promise.all([
+        bonusBalance(pool, userId),
+        pool.query('SELECT amount, kind, note, created_at FROM bonus_tx WHERE user_id = $1 ORDER BY id DESC LIMIT 20', [userId])
+      ]);
+      bonus = { userId, balance: bal, history: tx.rows.map(txOut) };
+    }
+    res.json({ success: true, bookings: list.rows.map(adminBooking), note: note.rows[0] ? note.rows[0].note : '', bonus });
   } catch (e) {
     console.error('admin/client:', e.message);
     res.status(500).json({ success: false, message: 'Помилка сервера.' });
@@ -2238,6 +2291,7 @@ app.post('/api/admin/booking/cancel', async (req, res) => {
     const r = await pool.query('DELETE FROM bookings WHERE id = $1 RETURNING *', [id]);
     const b = r.rows[0];
     if (!b) return res.status(404).json({ success: false, message: 'Бронювання вже скасоване.' });
+    await refundBookingBonus(b);
     const told = await tellClient(b.client_chat_id, `❌ Замовлення #${id} скасовано\nПричина: ${reason}`);
     tellGroup(`❌ #${id} (${b.name}, ${b.phone}, ${fmtDate(b.booking_date)} ${b.booking_time}) скасовано на сайті — ${adminWho(account)}\nПричина: ${reason}` +
       (told ? '' : '\nℹ️ Клієнт не підключений до бота: повідомте його вручну.'));
@@ -2310,6 +2364,327 @@ app.post('/api/admin/booking/move', async (req, res) => {
     res.json({ success: true, clientNotified: told });
   } catch (e) {
     console.error('admin/move:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+
+/* ================= БОНУСИ І ЗАПРОШЕННЯ ДРУЗІВ ================= */
+// Правила можна змінити змінними на Render, не чіпаючи код
+const envInt = (name, def, min, max) => {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n >= min && n <= max ? Math.floor(n) : def;
+};
+const BONUS = {
+  percent: envInt('BONUS_PERCENT', 3, 0, 50),         // % від суми, сплаченої грошима
+  maxShare: envInt('BONUS_MAX_SHARE', 50, 0, 100),     // скільки % гри можна оплатити балами
+  referral: envInt('BONUS_REFERRAL', 50, 0, 10000),   // за друга — і другу, і тому, хто запросив
+  welcome: envInt('BONUS_WELCOME', 50, 0, 10000),     // за першу гру
+  expireDays: envInt('BONUS_EXPIRE_DAYS', 365, 30, 3650), // згорають, якщо стільки днів не було візитів
+  warnDays: 30,                                        // за скільки днів попередити
+  refMonthly: 10                                       // скільки друзів на місяць винагороджуємо
+};
+const REF_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function isBirthdayCart(cart) {
+  return parseCart(cart).some((i) => /^День народження/i.test(i.device));
+}
+function shiftDate(date, days) {
+  const [y, m, d] = String(date).split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
+}
+async function bonusBalance(q, userId) {
+  const r = await q.query('SELECT COALESCE(SUM(amount), 0)::int AS b FROM bonus_tx WHERE user_id = $1', [userId]);
+  return r.rows[0].b;
+}
+function addBonusTx(q, userId, amount, kind, bookingId, note) {
+  return q.query('INSERT INTO bonus_tx (user_id, amount, kind, booking_id, note) VALUES ($1, $2, $3, $4, $5)',
+    [userId, Math.trunc(amount), kind, bookingId || null, String(note || '').slice(0, 200)]);
+}
+const txOut = (t) => ({ amount: t.amount, kind: t.kind, note: t.note || '', at: t.created_at });
+const tellUser = (user, text) => (user && user.telegram_id
+  ? bot.sendMessage(user.telegram_id, text).catch(() => {}) : Promise.resolve());
+const firstName = (name) => {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Друг';
+  return parts[0] + (parts[1] ? ' ' + parts[1][0] + '.' : '');
+};
+
+// Бронювання скасували або клієнт не прийшов: повертаємо списані бали (один раз)
+async function refundBookingBonus(b) {
+  try {
+    if (!b || !b.user_id || !(Number(b.bonus_used) > 0)) return;
+    // created_at: після /clear номери бронювань починаються спочатку, тож дивимось лише записи цього бронювання
+    const q = (kind) => pool.query(
+      `SELECT 1 FROM bonus_tx WHERE booking_id = $1 AND kind = $2 AND user_id = $3 AND created_at >= $4 LIMIT 1`,
+      [b.id, kind, b.user_id, b.created_at]);
+    const already = await q('refund');
+    const spent = await q('spend');
+    if (already.rows.length || !spent.rows.length) return;
+    await addBonusTx(pool, b.user_id, Number(b.bonus_used), 'refund', b.id, `Повернення: бронювання на ${fmtDate(b.booking_date).slice(0, 5)} скасовано`);
+  } catch (e) {
+    console.error('Повернення балів:', e.message);
+  }
+}
+
+// Нарахування за ігри, які відбулися. Адмін може до обіду наступного дня позначити «Не прийшов».
+async function creditVisits() {
+  const now = kyivToday();
+  const yesterday = shiftDate(now.date, -1);
+  const lastDay = kyivNow().getHours() >= 12 ? yesterday : shiftDate(now.date, -2);
+
+  // Непідтверджені ігри без руху два тижні: закриваємо, щоб не перевіряти щоразу
+  await pool.query(`UPDATE bookings SET bonus_state = 'skipped' WHERE bonus_state = 'new' AND booking_date < $1 AND NOT COALESCE(confirmed, FALSE)`, [shiftDate(now.date, -14)]);
+  await pool.query(`UPDATE bookings SET bonus_state = 'guest' WHERE bonus_state = 'new' AND user_id IS NULL AND booking_date <= $1`, [lastDay]);
+
+  const due = await pool.query(
+    `SELECT id FROM bookings WHERE bonus_state = 'new' AND user_id IS NOT NULL AND COALESCE(confirmed, FALSE)
+        AND booking_date <= $1 ORDER BY booking_date, id LIMIT 500`, [lastDay]);
+  for (const { id } of due.rows) {
+    const notes = [];
+    const db = await pool.connect();
+    try {
+      await db.query('BEGIN');
+      const r = await db.query(`UPDATE bookings SET bonus_state = 'done' WHERE id = $1 AND bonus_state = 'new' RETURNING *`, [id]);
+      const b = r.rows[0];
+      if (!b) { await db.query('ROLLBACK'); continue; }
+      const u = (await db.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [b.user_id])).rows[0];
+      if (!u) { await db.query('COMMIT'); continue; }
+      if (isBirthdayCart(b.cart_details)) {
+        await db.query(`UPDATE bookings SET bonus_state = 'birthday' WHERE id = $1`, [id]);
+        await db.query('COMMIT');
+        continue;
+      }
+      const day = fmtDate(b.booking_date).slice(0, 5);
+      const items = parseCart(b.cart_details).map((i) => `${i.device}, ${i.duration} год`).join(' + ');
+      const paid = Math.max(0, (Number(b.total_price) || 0) - (Number(b.bonus_used) || 0));
+      const earn = Math.floor(paid * BONUS.percent / 100);
+      let got = 0;
+      if (earn > 0) { await addBonusTx(db, u.id, earn, 'earn', id, `Гра ${day} · ${items} (${paid} грн)`); got += earn; }
+
+      const welcomed = await db.query(`SELECT 1 FROM bonus_tx WHERE user_id = $1 AND kind = 'welcome' LIMIT 1`, [u.id]);
+      if (!welcomed.rows.length && BONUS.welcome > 0) {
+        await addBonusTx(db, u.id, BONUS.welcome, 'welcome', id, 'Вітальні — за першу гру в клубі');
+        got += BONUS.welcome;
+      }
+
+      // Запрошений друг прийшов уперше
+      if (u.referred_by && u.referral_state === 'pending') {
+        // Другом вважаємо лише новий номер: якщо з нього бронювали ще до реєстрації, винагороди немає
+        const tail = phoneTail(b.phone);
+        const before = await db.query(
+          `SELECT 1 FROM bookings WHERE ${PHONE_TAIL_SQL} = $1 AND created_at < $2 AND id <> $3 LIMIT 1`, [tail, u.created_at, id]);
+        const inviter = (await db.query('SELECT * FROM users WHERE id = $1', [u.referred_by])).rows[0];
+        if (before.rows.length || !inviter) {
+          await db.query(`UPDATE users SET referral_state = 'rejected' WHERE id = $1`, [u.id]);
+        } else {
+          await db.query(`UPDATE users SET referral_state = 'rewarded' WHERE id = $1`, [u.id]);
+          if (BONUS.referral > 0) {
+            await addBonusTx(db, u.id, BONUS.referral, 'ref_friend', id, `Бонус за запрошення від ${firstName(inviter.name)}`);
+            got += BONUS.referral;
+            const month = await db.query(
+              `SELECT COUNT(*)::int AS n FROM bonus_tx WHERE user_id = $1 AND kind = 'ref_inviter' AND created_at > NOW() - INTERVAL '30 days'`, [inviter.id]);
+            if (month.rows[0].n < BONUS.refMonthly) {
+              await addBonusTx(db, inviter.id, BONUS.referral, 'ref_inviter', id, `Друг ${firstName(u.name)} прийшов на першу гру`);
+              notes.push([inviter, `🎉 Ваш друг ${firstName(u.name)} прийшов у LEVEL VR CLUB! Вам нараховано ${BONUS.referral} балів.`]);
+            }
+          }
+        }
+      }
+      await db.query('COMMIT');
+      if (got > 0) {
+        const bal = await bonusBalance(pool, u.id);
+        notes.push([u, `🎁 +${got} балів за гру ${day} у LEVEL VR CLUB. На рахунку: ${bal} балів (1 бал = 1 грн).`]);
+      }
+    } catch (e) {
+      try { await db.query('ROLLBACK'); } catch (_) { /* вже відкочено */ }
+      console.error(`Нарахування балів #${id}:`, e.message);
+      continue;
+    } finally {
+      db.release();
+    }
+    for (const [user, text] of notes) await tellUser(user, text);
+  }
+}
+
+// Бали згорають, якщо довго не було візитів; за місяць попереджаємо
+async function expireBonuses() {
+  const r = await pool.query(
+    `WITH s AS (
+       SELECT user_id, SUM(amount)::int AS bal,
+              MAX(created_at) FILTER (WHERE amount > 0 AND kind <> 'refund') AS last_act
+         FROM bonus_tx GROUP BY user_id
+     )
+     SELECT s.*, u.telegram_id, u.bonus_warned_at FROM s JOIN users u ON u.id = s.user_id
+      WHERE s.bal > 0 AND s.last_act < NOW() - make_interval(days => $1)`,
+    [BONUS.expireDays - BONUS.warnDays]);
+  for (const x of r.rows) {
+    const expiresAt = new Date(new Date(x.last_act).getTime() + BONUS.expireDays * 86400000);
+    if (expiresAt <= new Date()) {
+      await addBonusTx(pool, x.user_id, -x.bal, 'expire', null, `Згоріли: ${BONUS.expireDays} днів без візитів`);
+    } else if (!x.bonus_warned_at || new Date(x.bonus_warned_at) < new Date(x.last_act)) {
+      await pool.query('UPDATE users SET bonus_warned_at = NOW() WHERE id = $1', [x.user_id]);
+      const d = expiresAt.toLocaleDateString('uk-UA', { timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric' });
+      await tellUser(x, `⏳ У вас ${x.bal} балів у LEVEL VR CLUB. Вони згорять ${d}, якщо до того часу не прийти на гру. Чекаємо вас!`);
+    }
+  }
+}
+
+let bonusJobRunning = false;
+async function bonusJob() {
+  if (bonusJobRunning) return;
+  bonusJobRunning = true;
+  try {
+    await creditVisits();
+    await expireBonuses();
+  } catch (e) {
+    console.error('Бонуси (щогодини):', e.message);
+  } finally {
+    bonusJobRunning = false;
+  }
+}
+cron.schedule('41 * * * *', bonusJob);
+
+async function ensureRefCode(user) {
+  if (user.ref_code) return user.ref_code;
+  for (let i = 0; i < 8; i++) {
+    const code = Array.from(crypto.randomBytes(6), (x) => REF_ALPHABET[x % REF_ALPHABET.length]).join('');
+    try {
+      const r = await pool.query('UPDATE users SET ref_code = $1 WHERE id = $2 AND ref_code IS NULL RETURNING ref_code', [code, user.id]);
+      if (r.rows[0]) return r.rows[0].ref_code;
+      const again = await pool.query('SELECT ref_code FROM users WHERE id = $1', [user.id]);
+      if (again.rows[0] && again.rows[0].ref_code) return again.rows[0].ref_code;
+    } catch (e) {
+      if (e.code !== '23505') throw e; // такий код уже є: пробуємо інший
+    }
+  }
+  throw new Error('ref_code');
+}
+
+app.get('/api/bonus', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    const u = account.user;
+    const [code, bal, tx, friends, last] = await Promise.all([
+      ensureRefCode(u),
+      bonusBalance(pool, u.id),
+      pool.query('SELECT amount, kind, note, created_at FROM bonus_tx WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [u.id]),
+      pool.query('SELECT name, referral_state, created_at FROM users WHERE referred_by = $1 ORDER BY id DESC LIMIT 50', [u.id]),
+      pool.query(`SELECT MAX(created_at) AS t FROM bonus_tx WHERE user_id = $1 AND amount > 0 AND kind <> 'refund'`, [u.id])
+    ]);
+    const lastAct = last.rows[0].t;
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      success: true,
+      balance: bal,
+      rules: { percent: BONUS.percent, maxShare: BONUS.maxShare, referral: BONUS.referral, welcome: BONUS.welcome, expireDays: BONUS.expireDays },
+      expiresAt: bal > 0 && lastAct ? new Date(new Date(lastAct).getTime() + BONUS.expireDays * 86400000) : null,
+      history: tx.rows.map(txOut),
+      refCode: code,
+      refLink: `${String(SITE_URL || 'https://level-vr-club.vn.ua').replace(/\/+$/, '')}/?ref=${code}`,
+      friends: friends.rows.map((f) => ({ name: firstName(f.name), state: f.referral_state || 'pending', at: f.created_at })),
+      referredBy: !!u.referred_by
+    });
+  } catch (e) {
+    console.error('bonus:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+// Новий клієнт прийшов за посиланням друга: запамʼятовуємо, хто запросив
+app.post('/api/bonus/referral', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    const u = account.user;
+    const code = String((req.body && req.body.code) || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,12}$/.test(code)) return res.status(400).json({ success: false, message: 'Некоректний код.' });
+    if (u.referred_by) return res.json({ success: true, applied: false, reason: 'already' });
+
+    const inviter = (await pool.query('SELECT * FROM users WHERE ref_code = $1', [code])).rows[0];
+    if (!inviter) return res.json({ success: true, applied: false, reason: 'unknown' });
+    if (inviter.id === u.id) return res.json({ success: true, applied: false, reason: 'self' });
+    const tail = phoneTail(u.phone);
+    if (tail && tail === phoneTail(inviter.phone)) return res.json({ success: true, applied: false, reason: 'self' });
+
+    // Лише для нових акаунтів, які ще не бронювали
+    const fresh = (Date.now() - new Date(u.created_at).getTime()) < 3 * 86400000;
+    const booked = await pool.query('SELECT 1 FROM bookings WHERE user_id = $1 LIMIT 1', [u.id]);
+    if (!fresh || booked.rows.length) return res.json({ success: true, applied: false, reason: 'old' });
+
+    const r = await pool.query(
+      `UPDATE users SET referred_by = $1, referral_state = 'pending' WHERE id = $2 AND referred_by IS NULL RETURNING id`, [inviter.id, u.id]);
+    res.json({ success: true, applied: !!r.rows[0], inviter: firstName(inviter.name), bonus: BONUS.referral });
+  } catch (e) {
+    console.error('bonus/referral:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+// Адмін: клієнт не прийшов — балів за гру не буде, списані бали повертаються
+app.post('/api/admin/booking/noshow', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const account = await requireSiteAdmin(req, res);
+    if (!account) return;
+    const id = bookingIdFrom(req.body);
+    if (!id) return res.status(400).json({ success: false, message: 'Некоректне бронювання.' });
+    const r = await pool.query(`UPDATE bookings SET bonus_state = 'noshow' WHERE id = $1 AND bonus_state = 'new' RETURNING *`, [id]);
+    const b = r.rows[0];
+    if (!b) return res.status(409).json({ success: false, message: 'Бали за цю гру вже нараховані або гру вже позначено.' });
+    await refundBookingBonus(b);
+    tellGroup(`🚫 #${id} (${b.name}, ${fmtDate(b.booking_date)} ${b.booking_time}) — не прийшов. Позначив ${adminWho(account)}`);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('admin/noshow:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+// Адмін: нарахувати або списати бали вручну (подарунок, виправлення)
+app.post('/api/admin/bonus/adjust', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const account = await requireSiteAdmin(req, res);
+    if (!account) return;
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    const userId = /^\d{1,9}$/.test(String(b.userId)) ? Number(b.userId) : null;
+    const amount = Number(b.amount);
+    const reason = String(b.reason ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, 150);
+    if (!userId) return res.status(400).json({ success: false, message: 'Некоректний клієнт.' });
+    if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > 100000) {
+      return res.status(400).json({ success: false, message: 'Вкажіть ціле число балів (наприклад 50 або -50).' });
+    }
+    if (reason.length < 2) return res.status(400).json({ success: false, message: 'Вкажіть причину.' });
+
+    const db = await pool.connect();
+    let balance;
+    let user;
+    try {
+      await db.query('BEGIN');
+      user = (await db.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId])).rows[0];
+      if (!user) { await db.query('ROLLBACK'); return res.status(404).json({ success: false, message: 'Клієнта не знайдено.' }); }
+      const bal = await bonusBalance(db, userId);
+      if (bal + amount < 0) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: `На рахунку лише ${bal} балів.` });
+      }
+      await addBonusTx(db, userId, amount, 'admin', null, `${reason} (${adminWho(account)})`);
+      await db.query('COMMIT');
+      balance = bal + amount;
+    } catch (e) {
+      try { await db.query('ROLLBACK'); } catch (_) { /* вже відкочено */ }
+      throw e;
+    } finally {
+      db.release();
+    }
+    if (amount > 0) tellUser(user, `🎁 Вам нараховано ${amount} балів у LEVEL VR CLUB: ${reason}. На рахунку: ${balance}.`);
+    res.json({ success: true, balance });
+  } catch (e) {
+    console.error('admin/bonus:', e.message);
     res.status(500).json({ success: false, message: 'Помилка сервера.' });
   }
 });

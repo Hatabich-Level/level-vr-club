@@ -94,6 +94,20 @@ const LevelAuth = (() => {
     return { getToken, setToken, headers, me };
 })();
 
+// Посилання друга (?ref=КОД): запамʼятовуємо, а привʼяжемо після входу в кабінет
+(function rememberReferral() {
+    try {
+        const code = new URLSearchParams(location.search).get('ref');
+        if (!code || !/^[A-Za-z0-9]{4,12}$/.test(code)) return;
+        localStorage.setItem('levelRef', JSON.stringify({ code: code.toUpperCase(), at: Date.now() }));
+        window.__levelRefNew = true;
+    } catch (e) { /* приватний режим */ }
+})();
+document.addEventListener('DOMContentLoaded', () => {
+    if (!window.__levelRefNew || LevelAuth.getToken() || typeof showNotification !== 'function') return;
+    showNotification('🎁 Тебе запросив друг! Увійди в кабінет через Telegram або Google — після першої гри отримаєш бонусні бали.', 'success');
+});
+
 updateAccountLink(); // одразу, щоб напис не блимав; якщо сесія вже недійсна, me() нижче поверне «Реєстрація/Вхід»
 
 // Клієнту, який увійшов, підставляємо імʼя й телефон у форми бронювання
@@ -646,6 +660,55 @@ document.querySelectorAll(".card-v2").forEach(card => {
   }
 });
 
+// === Оплата балами (лише для клієнтів, які увійшли) ===
+let bonusInfo = null; // { balance, maxShare, percent } — береться з сервера при відкритті форми
+async function refreshBonusBox(force) {
+  const box = document.getElementById('bonus-box');
+  if (!box) return;
+  const hide = () => { box.hidden = true; box.textContent = ''; };
+  // На день народження бонусів немає
+  if (!cart.length || cart.some((i) => /^День народження/i.test(String(i.device || '')))) return hide();
+  const user = await LevelAuth.me();
+  if (!user) return hide();
+  try {
+    if (!bonusInfo || force) {
+      const res = await fetch(`${BOOKING_API}/api/bonus`, { headers: LevelAuth.headers(), cache: 'no-store' });
+      const d = await res.json();
+      if (!d || !d.success) return hide();
+      bonusInfo = { balance: d.balance, maxShare: d.rules.maxShare, percent: d.rules.percent };
+    }
+  } catch (e) { return hide(); }
+
+  const total = Number(totalPrice) || 0;
+  const canUse = Math.max(0, Math.min(bonusInfo.balance, Math.floor(total * bonusInfo.maxShare / 100)));
+  const prev = document.getElementById('bonus-use');
+  const checked = prev ? prev.checked : true;
+  box.textContent = '';
+  const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+
+  let use = 0;
+  if (canUse > 0) {
+    const label = mk('label', 'bonus-use');
+    const cb = mk('input'); cb.type = 'checkbox'; cb.id = 'bonus-use'; cb.checked = checked;
+    cb.addEventListener('change', () => refreshBonusBox());
+    const txt = mk('span');
+    txt.append('Оплатити балами ', mk('b', '', `−${canUse} грн`));
+    txt.appendChild(document.createElement('br'));
+    txt.append(`У тебе ${bonusInfo.balance} балів. Балами можна оплатити до ${bonusInfo.maxShare}% суми.`);
+    label.append(cb, txt);
+    box.appendChild(label);
+    use = cb.checked ? canUse : 0;
+    const line = mk('div', 'bonus-line');
+    line.append(mk('span', '', 'До сплати в клубі'), mk('span', '', `${total - use} грн`));
+    box.appendChild(line);
+  } else {
+    box.appendChild(mk('div', '', bonusInfo.balance > 0 ? `У тебе ${bonusInfo.balance} балів.` : 'Бонусні бали: поки 0.'));
+  }
+  const earn = Math.floor((total - use) * bonusInfo.percent / 100);
+  if (earn > 0) box.appendChild(mk('div', 'bonus-earn', `За цю гру повернеться +${earn} балів (після візиту)`));
+  box.hidden = false;
+}
+
 // === Відкрити модальне вікно ===
 function openModal() {
   if (cart.length === 0) {
@@ -662,6 +725,7 @@ function openModal() {
     updateAgeConfirmVisibility();
     refreshModalAvailability();
     prefillBookingForms();
+    refreshBonusBox(true);
   }
 }
 
@@ -731,6 +795,7 @@ async function submitOrder() {
       phone: phone,
       comment: comment,
       website: document.getElementById("hp-website")?.value || "",
+      useBonus: !!document.getElementById("bonus-use")?.checked,
       formToken: await takeFormToken()
     };
 
@@ -752,11 +817,13 @@ const data = await response.json();
       const botUsername = "priwetabot"; 
       const orderId = data.orderId;
 
+      const paidNote = data.bonusUsed > 0 ? ` Оплачено балами: ${data.bonusUsed} грн, до сплати в клубі: ${data.toPay} грн.` : '';
+      bonusInfo = null;
       if (data.botLinked) {
         // Клієнт увійшов через Telegram: бот уже знає, кому писати
-        showNotification(`✅ Бронювання #${orderId} створено! Підтвердження й нагадування прийдуть вам у Telegram.`, "success");
+        showNotification(`✅ Бронювання #${orderId} створено!${paidNote} Підтвердження й нагадування прийдуть вам у Telegram.`, "success");
       } else {
-        showNotification(`✅ Бронювання #${orderId} успішно створено!`, "success");
+        showNotification(`✅ Бронювання #${orderId} успішно створено!${paidNote}`, "success");
       }
       const userWantsBot = !data.botLinked && await showConfirm(`Перейти до Telegram-бота та отримати квиток із підтвердженням?`);
       

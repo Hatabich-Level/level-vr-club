@@ -3124,6 +3124,54 @@ html, body {
     cursor: pointer;
 }
 
+/* Оплата балами у формі бронювання */
+.bonus-box {
+    margin: 0 0 20px;
+    padding: 14px;
+    border: 1px solid rgba(0, 255, 136, 0.5);
+    background: rgba(0, 255, 136, 0.05);
+    font-family: 'Noto Sans', sans-serif;
+    text-align: left;
+    color: #ccc;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+.bonus-box[hidden] { display: none !important; }
+.bonus-box .bonus-use {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 10px;
+    align-items: start;
+    cursor: pointer;
+}
+.bonus-box input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 2px 0 0;
+    accent-color: #00FF88;
+    cursor: pointer;
+}
+.bonus-box b { color: #00FF88; }
+.bonus-box .bonus-use span {
+    color: #ccc;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.85rem;
+}
+.bonus-box .bonus-use span b { font-size: 1rem; }
+.bonus-box .bonus-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 255, 136, 0.2);
+    color: #fff;
+    font-weight: 700;
+}
+.bonus-box .bonus-earn { color: #00FF88; font-size: 0.8rem; margin-top: 4px; }
+
 /* Показуємо блок підтвердження віку тільки коли в кошику є VR-товар */
 .age-confirm.hidden {
     display: none !important;

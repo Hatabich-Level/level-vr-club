@@ -174,6 +174,41 @@
                 .adm-scroll{display:none}
                 .adm-cards{display:flex}
             }
+
+            /* --- бонуси і запрошення друзів --- */
+            .bn-hero-stats{display:flex;gap:16px 40px;flex-wrap:wrap;justify-content:flex-end}
+            .acc-big.bn-pts{color:#00FF88;text-shadow:0 0 18px rgba(0,255,136,.4)}
+            .bn-sub{margin:14px 0 -2px;font-size:13px;letter-spacing:3px;color:#00F0FF;text-transform:uppercase;font-weight:600}
+            .bn-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+            .bn-rules div{background:#0B1216;border:1px solid #1B2A30;padding:16px;display:flex;flex-direction:column;gap:6px}
+            .bn-rules b{font-size:28px;color:#00FF88;line-height:1}
+            .bn-rules span{font-size:13px;color:#A9B4BC;line-height:1.4}
+            .bn-hist{background:#0B1216;border:1px solid #1B2A30;padding:4px 16px}
+            .bn-hist div{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px dashed #1B2A30;font-size:14px;color:#ddd}
+            .bn-hist div:last-child{border-bottom:0}
+            .bn-hist b{color:#00FF88;margin-right:8px;font-size:15px;white-space:nowrap}
+            .bn-hist .m b{color:#FF6A9A}
+            .bn-hist em{font-style:normal;color:#6b767d;white-space:nowrap}
+            .bn-link{display:block;width:100%;box-sizing:border-box;background:#070A0D;border:1px dashed #00F0FF;padding:12px;color:#00F0FF;font:600 14px 'Noto Sans',sans-serif;overflow-wrap:anywhere;text-align:left;user-select:all}
+            .bn-row{display:flex;gap:8px}.bn-row>*{flex:1 1 0;min-width:0}
+            .bn-tg{min-height:48px;display:inline-flex;align-items:center;justify-content:center;text-align:center;background:none;border:1px solid #29B6F6;color:#29B6F6;font:700 13px 'Noto Sans',sans-serif;text-decoration:none;padding:0 8px}
+            .bn-tg:hover{background:rgba(41,182,246,.1)}
+            .bn-friends{display:flex;flex-direction:column;gap:6px}
+            .bn-friends div{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:#ddd;border-bottom:1px dashed #1B2A30;padding-bottom:6px}
+            .bn-friends em{font-style:normal;font-size:12px;color:#FFC857;text-align:right}
+            .bn-friends em.ok{color:#00FF88}.bn-friends em.no{color:#6b767d}
+            .bn-ref b{color:#00FF88}
+            .bn-note{margin:0;padding:10px 12px;border:1px solid rgba(0,255,136,.4);background:rgba(0,255,136,.06);color:#bfffe0;font-size:13px;line-height:1.5}
+            .adm-bonus-form{display:flex;gap:8px;flex-wrap:wrap}
+            .adm-bonus-form input{min-height:44px;box-sizing:border-box;padding:0 10px;background:#070A0D;border:1px solid #2A3A42;color:#fff;font:16px 'Noto Sans',sans-serif;min-width:0}
+            .adm-bonus-form input[type=number]{flex:0 0 120px}
+            .adm-bonus-form input[type=text]{flex:1 1 140px}
+            .adm-bonus-form .adm-btn{min-height:44px}
+            .adm-pay{color:#00FF88}
+            @media (max-width:600px){
+                .bn-rules{grid-template-columns:1fr}
+                .bn-hero-stats{width:100%;justify-content:space-between}
+            }
         </style>
     </head>
     <body>
@@ -261,10 +296,17 @@
                     <h2 class="acc-name" id="acc-hello"></h2>
                     <span class="acc-sub" id="acc-who"></span>
                 </div>
-                <div class="acc-hero-stat">
-                    <span class="acc-label dim">Майбутні бронювання</span>
-                    <span class="acc-big" id="acc-count">0</span>
-                    <span class="acc-sub" id="acc-count-sub"></span>
+                <div class="bn-hero-stats">
+                    <div class="acc-hero-stat">
+                        <span class="acc-label dim">Бонусний рахунок</span>
+                        <span class="acc-big bn-pts" id="bn-balance">–</span>
+                        <span class="acc-sub">балів · 1 бал = 1 грн</span>
+                    </div>
+                    <div class="acc-hero-stat">
+                        <span class="acc-label dim">Майбутні бронювання</span>
+                        <span class="acc-big" id="acc-count">0</span>
+                        <span class="acc-sub" id="acc-count-sub"></span>
+                    </div>
                 </div>
             </div>
 
@@ -273,14 +315,39 @@
                     <div class="acc-tabs" role="tablist" aria-label="Бронювання">
                         <button type="button" class="acc-tab" role="tab" id="acc-tab-up" aria-controls="acc-upcoming" aria-selected="true">Бронювання</button>
                         <button type="button" class="acc-tab" role="tab" id="acc-tab-past" aria-controls="acc-past" aria-selected="false">Історія</button>
+                        <button type="button" class="acc-tab" role="tab" id="acc-tab-bonus" aria-controls="acc-bonus" aria-selected="false">Бонуси</button>
                     </div>
                     <div class="acc-list" id="acc-upcoming" role="tabpanel" aria-labelledby="acc-tab-up"></div>
                     <div class="acc-list" id="acc-past" role="tabpanel" aria-labelledby="acc-tab-past" hidden></div>
+                    <div class="acc-list" id="acc-bonus" role="tabpanel" aria-labelledby="acc-tab-bonus" hidden>
+                        <div class="bn-sub">Як працюють бонуси</div>
+                        <div class="bn-rules">
+                            <div><b id="bn-r-percent">3%</b><span>від суми, сплаченої грошима, повертається балами</span></div>
+                            <div><b id="bn-r-share">до 50%</b><span>суми гри можна оплатити балами</span></div>
+                            <div><b id="bn-r-ref">+50</b><span>тобі й другу, коли він прийде на першу гру</span></div>
+                        </div>
+                        <p class="acc-hint" id="bn-rules-more"></p>
+                        <div class="bn-sub">Рух балів</div>
+                        <div class="bn-hist" id="bn-history"><div><span>Завантаження...</span></div></div>
+                    </div>
                     <a class="acc-cta" href="index.html#pricing">Забронювати гру</a>
                     <p class="acc-hint">Тут з'являються бронювання, зроблені після входу в кабінет.</p>
                 </div>
 
                 <aside class="acc-side">
+                    <section class="acc-box bn-ref" id="bn-ref-box">
+                        <h2>Запроси друга</h2>
+                        <p id="bn-ref-text">Друг отримує <b>50 балів</b> за першу гру, а ти — <b>50 балів</b>, щойно він прийде.</p>
+                        <p class="bn-note" id="bn-invited" hidden></p>
+                        <button type="button" class="bn-link" id="bn-link" aria-label="Твоє посилання для друзів">...</button>
+                        <div class="bn-row">
+                            <button type="button" class="acc-save" id="bn-copy">Копіювати</button>
+                            <a class="bn-tg" id="bn-share" href="#" target="_blank" rel="noopener">Надіслати в Telegram</a>
+                        </div>
+                        <p class="acc-msg" id="bn-copy-msg" role="status"></p>
+                        <label id="bn-friends-l" hidden>Твої друзі</label>
+                        <div class="bn-friends" id="bn-friends"></div>
+                    </section>
                     <section class="acc-box">
                         <h2>Мої дані</h2>
                         <p>Ім'я і телефон самі підставляються у форму бронювання.</p>
@@ -636,7 +703,8 @@
                 const longest = Math.max(1, ...items.map((i) => Number(i.duration) || 0));
                 const day = DAYS[date.getDay()];
                 info.appendChild(el('span', '', `${day.charAt(0).toUpperCase() + day.slice(1)}, ${b.time}–${hhmm(t[0] * 60 + t[1] + longest * 60)}`));
-                info.appendChild(el('span', 'acc-price', `Замовлення #${b.id} · ${b.total} грн`));
+                info.appendChild(el('span', 'acc-price', `Замовлення #${b.id} · ${b.total} грн` +
+                    (b.bonusUsed > 0 ? ` · ${b.bonusUsed} балами → до сплати ${b.total - b.bonusUsed} грн` : '')));
                 row.appendChild(info);
 
                 if (past) row.appendChild(el('span', 'acc-chip done', 'Завершено'));
@@ -645,14 +713,14 @@
             }
 
             function selectTab(which) {
-                const past = which === 'past';
-                $('acc-tab-up').setAttribute('aria-selected', String(!past));
-                $('acc-tab-past').setAttribute('aria-selected', String(past));
-                show('acc-upcoming', !past);
-                show('acc-past', past);
+                [['up', 'acc-upcoming'], ['past', 'acc-past'], ['bonus', 'acc-bonus']].forEach(([k, id]) => {
+                    $('acc-tab-' + k).setAttribute('aria-selected', String(which === k));
+                    show(id, which === k);
+                });
             }
             $('acc-tab-up').addEventListener('click', () => selectTab('up'));
             $('acc-tab-past').addEventListener('click', () => selectTab('past'));
+            $('acc-tab-bonus').addEventListener('click', () => selectTab('bonus'));
 
             async function loadBookings() {
                 const up = $('acc-upcoming');
@@ -712,6 +780,7 @@
                 selectTab('up');
                 setMsg('acc-profile-msg', user.phone ? '' : 'Додайте телефон, і він сам підставлятиметься у бронювання.');
                 loadBookings();
+                loadBonus();
             }
 
             $('acc-save').addEventListener('click', async () => {
@@ -747,6 +816,93 @@
             $('acc-reload').addEventListener('click', () => location.reload());
 
 
+
+            /* ================= БОНУСИ І ДРУЗІ ================= */
+            const TX_LABEL = { earn: '', welcome: '', ref_friend: '', ref_inviter: '', spend: '', refund: '', admin: '', expire: '' };
+            const shortDate = (iso) => { try { return new Date(iso).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' }); } catch (e) { return ''; } };
+            const longDate = (iso) => { try { return new Date(iso).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (e) { return ''; } };
+            function renderTxList(box, history, emptyText) {
+                box.textContent = '';
+                if (!history.length) { const d = el('div'); d.appendChild(el('span', '', emptyText)); box.appendChild(d); return; }
+                history.forEach((t) => {
+                    const d = el('div');
+                    const left = el('span', t.amount < 0 ? 'm' : '');
+                    left.appendChild(el('b', '', (t.amount > 0 ? '+' : t.amount < 0 ? '−' : '') + Math.abs(t.amount)));
+                    left.appendChild(document.createTextNode(t.note || TX_LABEL[t.kind] || ''));
+                    d.appendChild(left);
+                    d.appendChild(el('em', '', shortDate(t.at)));
+                    box.appendChild(d);
+                });
+            }
+            async function loadBonus() {
+                try {
+                    const r = await api('/api/bonus');
+                    if (r.status === 401) { LevelAuth.setToken(''); return showLogin('Сесія закінчилась. Увійдіть ще раз.'); }
+                    if (!r.data.success) throw new Error('server');
+                    const d = r.data, rl = d.rules;
+                    $('bn-balance').textContent = String(d.balance);
+                    $('bn-r-percent').textContent = rl.percent + '%';
+                    $('bn-r-share').textContent = 'до ' + rl.maxShare + '%';
+                    $('bn-r-ref').textContent = '+' + rl.referral;
+                    $('bn-rules-more').textContent = `За першу гру — ще ${rl.welcome} вітальних балів. На день народження бонуси не діють. ` +
+                        `Бали нараховуються наступного дня після гри і згорають, якщо ${Math.round(rl.expireDays / 30)} міс. не було візитів` +
+                        (d.expiresAt ? ` (твої — ${longDate(d.expiresAt)}).` : '.');
+                    renderTxList($('bn-history'), d.history, 'Поки що руху балів немає. Перші бали прийдуть після гри.');
+
+                    $('bn-ref-text').textContent = '';
+                    const t = $('bn-ref-text');
+                    t.append('Друг отримує ', el('b', '', rl.referral + ' балів'), ' за першу гру, а ти — ', el('b', '', rl.referral + ' балів'), ', щойно він прийде.');
+                    $('bn-link').textContent = d.refLink;
+                    $('bn-share').href = 'https://t.me/share/url?url=' + encodeURIComponent(d.refLink) +
+                        '&text=' + encodeURIComponent(`Го в LEVEL VR CLUB — PS5 і VR у Калинівці! За моїм посиланням отримаєш ${rl.referral} бонусних балів 🎮`);
+                    const fr = $('bn-friends');
+                    fr.textContent = '';
+                    show('bn-friends-l', d.friends.length > 0);
+                    d.friends.forEach((f) => {
+                        const row = el('div');
+                        row.appendChild(el('span', '', f.name));
+                        const st = { rewarded: ['ok', `прийшов · +${rl.referral}`], rejected: ['no', 'без бонусу (вже був клієнтом)'], pending: ['', 'чекаємо першу гру'] }[f.state] || ['', ''];
+                        row.appendChild(el('em', st[0], st[1]));
+                        fr.appendChild(row);
+                    });
+                } catch (e) {
+                    $('bn-balance').textContent = '–';
+                    $('bn-history').textContent = '';
+                    const d = el('div'); d.appendChild(el('span', '', 'Не вдалося завантажити бонуси. Оновіть сторінку.')); $('bn-history').appendChild(d);
+                }
+            }
+            $('bn-copy').addEventListener('click', async () => {
+                const link = $('bn-link').textContent;
+                try {
+                    // деякі браузери не відповідають на запит буфера обміну: не чекаємо довше секунди
+                    await Promise.race([navigator.clipboard.writeText(link), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 1000))]);
+                } catch (e) {
+                    const range = document.createRange(); range.selectNodeContents($('bn-link'));
+                    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+                    try { document.execCommand('copy'); } catch (_) { /* лишаємо виділеним */ }
+                }
+                setMsg('bn-copy-msg', 'Посилання скопійовано — надішли його другу.', true);
+            });
+            $('bn-link').addEventListener('click', () => $('bn-copy').click());
+
+            // Прийшли за посиланням друга (?ref=...): привʼязуємо після входу
+            async function applyReferral() {
+                let saved = null;
+                try { saved = JSON.parse(localStorage.getItem('levelRef') || 'null'); } catch (e) { saved = null; }
+                if (!saved || !saved.code) return;
+                try {
+                    const r = await api('/api/bonus/referral', { method: 'POST', body: { code: saved.code } });
+                    if (r.status === 401) return;
+                    try { localStorage.removeItem('levelRef'); } catch (e) { /* приватний режим */ }
+                    if (r.data.success && r.data.applied) {
+                        const n = $('bn-invited');
+                        n.textContent = `Тебе запросив(ла) ${r.data.inviter}. Після першої гри отримаєш ${r.data.bonus} балів за запрошення.`;
+                        n.hidden = false;
+                        loadBonus();
+                    }
+                } catch (e) { /* спробуємо наступного разу */ }
+            }
+
             /* ================= АДМІН-ПАНЕЛЬ ================= */
             const adm = { today: '', bookings: [], clients: null, filter: 'all', tail: '', user: null };
             const money = (n) => (Number(n) || 0).toLocaleString('uk-UA').replace(/ /g, ' ');
@@ -759,8 +915,8 @@
                 const d = new Date(p[0], p[1] - 1, p[2]);
                 const t = String(adm.today).split('-').map(Number);
                 const diff = Math.round((d - new Date(t[0], t[1] - 1, t[2])) / 86400000);
-                const name = diff === 0 ? 'Сьогодні' : diff === 1 ? 'Завтра' : DAYS[d.getDay()];
-                return `${name.charAt(0).toUpperCase() + name.slice(1)} · ${diff <= 1 ? DAYS[d.getDay()] + ' ' : ''}${ddmm(date)}`;
+                const name = diff === 0 ? 'Сьогодні' : diff === 1 ? 'Завтра' : diff === -1 ? 'Вчора' : DAYS[d.getDay()];
+                return `${name.charAt(0).toUpperCase() + name.slice(1)} · ${Math.abs(diff) <= 1 ? DAYS[d.getDay()] + ' ' : ''}${ddmm(date)}`;
             }
             function authFail(r) {
                 if (r.status === 401) { LevelAuth.setToken(''); showLogin('Сесія закінчилась. Увійдіть ще раз.'); return true; }
@@ -821,6 +977,7 @@
                 info.appendChild(el('span', '', items.map((i) => `${i.device} · ${i.duration} год`).join(' + ') || 'Бронювання'));
                 if (b.comment) info.appendChild(el('span', 'adm-comment', '💬 ' + b.comment));
                 info.appendChild(el('span', 'acc-price', `#${b.id} · ${money(b.total)} грн`));
+                if (b.bonusUsed > 0) info.appendChild(el('span', 'adm-pay', `🎁 ${money(b.bonusUsed)} балами → взяти в клубі ${money(b.total - b.bonusUsed)} грн`));
                 row.appendChild(info);
                 row.appendChild(el('span', 'acc-chip ' + (b.confirmed ? 'ok' : 'wait'), b.confirmed ? 'Підтверджено' : 'Очікує'));
 
@@ -837,6 +994,21 @@
                         const r = await act('/api/admin/booking/confirm', { id: b.id }, msg, ok);
                         if (r && r.data.success) { setMsgEl(msg, doneNote(r, 'Підтверджено.'), true); setTimeout(loadAdmin, 1600); }
                     });
+                }
+                if (b.hasAccount && b.bonusState === 'new' && b.confirmed && b.date <= adm.today) {
+                    const ns = btn('Не прийшов', 'no', () => {
+                        form.hidden = false; form.textContent = '';
+                        const yes = el('button', 'adm-btn no', 'Так, не прийшов'); yes.type = 'button';
+                        const no = el('button', 'adm-btn', 'Ні'); no.type = 'button';
+                        no.addEventListener('click', () => { form.hidden = true; });
+                        yes.addEventListener('click', async () => {
+                            const r = await act('/api/admin/booking/noshow', { id: b.id }, msg, yes);
+                            if (r && r.data.success) { setMsgEl(msg, 'Позначено. Балів за цю гру не буде' + (b.bonusUsed ? ', списані бали повернуто.' : '.'), true); setTimeout(loadAdmin, 1600); }
+                        });
+                        [el('span', 'acc-hint', 'Клієнт не отримає балів за цю гру.'), yes, no, msg].forEach((n) => form.appendChild(n));
+                        setMsgEl(msg, '');
+                    });
+                    ns.title = 'Бали за гру нараховуються наступного дня після 12:00';
                 }
                 btn('Перенести', '', () => {
                     form.hidden = false; form.textContent = '';
@@ -966,7 +1138,7 @@
                 const table = el('table', 'adm-table');
                 const thead = el('thead');
                 const hr = el('tr');
-                ['Клієнт', 'Телефон', 'Вхід', 'Візитів', 'Витрачено', 'Останній візит'].forEach((h) => hr.appendChild(el('th', '', h)));
+                ['Клієнт', 'Телефон', 'Вхід', 'Візитів', 'Витрачено', 'Бали', 'Останній візит'].forEach((h) => hr.appendChild(el('th', '', h)));
                 thead.appendChild(hr);
                 table.appendChild(thead);
                 const tbody = el('tbody');
@@ -979,6 +1151,7 @@
                     const src = el('td'); src.appendChild(srcChip(c.source)); tr.appendChild(src);
                     tr.appendChild(el('td', '', String(c.visits) + (c.upcoming ? ` (+${c.upcoming})` : '')));
                     tr.appendChild(el('td', '', `${money(c.spent)} грн`));
+                    tr.appendChild(el('td', '', c.bonus === null || c.bonus === undefined ? '—' : String(c.bonus)));
                     tr.appendChild(el('td', '', c.last ? ddmm(c.last) + '.' + c.last.slice(0, 4) : '—'));
                     tr.addEventListener('click', () => openClient(c.tail));
                     tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openClient(c.tail); });
@@ -1068,6 +1241,30 @@
                     });
                     if (!list.length) hist.appendChild(el('span', '', 'Бронювань немає.'));
                     box.appendChild(hist);
+
+                    if (r.data.bonus) {
+                        const bz = r.data.bonus;
+                        box.appendChild(el('label', '', `Бонуси · на рахунку ${money(bz.balance)} балів`));
+                        const bh = el('div', 'bn-hist');
+                        renderTxList(bh, bz.history.slice(0, 8), 'Руху балів ще не було.');
+                        box.appendChild(bh);
+                        const f = el('div', 'adm-bonus-form');
+                        const amt = el('input'); amt.type = 'number'; amt.step = '1'; amt.placeholder = '50 / -50'; amt.setAttribute('aria-label', 'Скільки балів');
+                        const why = el('input'); why.type = 'text'; why.maxLength = 150; why.placeholder = 'Причина'; why.setAttribute('aria-label', 'Причина');
+                        const go = el('button', 'adm-btn ok', 'Зарахувати'); go.type = 'button';
+                        const bmsg = el('p', 'acc-msg'); bmsg.setAttribute('role', 'status');
+                        go.addEventListener('click', async () => {
+                            const n = Number(amt.value);
+                            if (!Number.isInteger(n) || n === 0) { setMsgEl(bmsg, 'Вкажіть ціле число: 50 — нарахувати, -50 — списати.'); return; }
+                            const res = await act('/api/admin/bonus/adjust', { userId: bz.userId, amount: n, reason: why.value }, bmsg, go);
+                            if (res && res.data.success) { setMsgEl(bmsg, `Готово. На рахунку ${money(res.data.balance)} балів.`, true); setTimeout(() => openClient(tail, true), 900); if (adm.clients) loadClients(); }
+                        });
+                        f.append(amt, why, go);
+                        box.appendChild(f);
+                        box.appendChild(bmsg);
+                    } else {
+                        box.appendChild(el('p', 'acc-hint', 'Бонуси: клієнт без акаунта на сайті — бали не нараховуються.'));
+                    }
 
                     const nl = el('label', '', 'Нотатка (бачать тільки адміни)');
                     nl.htmlFor = 'adm-note';
@@ -1315,6 +1512,7 @@
 
             const wantsClientView = new URLSearchParams(location.search).get('view') === 'client';
             function showUser(user) {
+                applyReferral();
                 if (user && user.isAdmin && !wantsClientView) return showAdmin(user);
                 showCabinet(user);
             }
