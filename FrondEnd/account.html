@@ -85,6 +85,78 @@
                 .acc-side{flex-basis:100%;min-width:0}
                 .acc-tab{padding:0 14px}
             }
+
+            /* --- адмін-панель (бачать лише адміни; сервер перевіряє доступ сам) --- */
+            .acc-hero.adm{flex-direction:column;align-items:stretch}
+            .adm-top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+            .adm-switch{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #2A3A42;color:#A9B4BC;font:600 13px 'Noto Sans',sans-serif;text-decoration:none}
+            .adm-switch:hover{border-color:#00F0FF;color:#00F0FF}
+            .adm-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;width:100%}
+            .adm-stat{background:#070A0D;border:1px solid #1B2A30;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+            .adm-stat b{font-size:34px;font-weight:800;line-height:1;color:#fff;overflow-wrap:anywhere}
+            .adm-stat b.c{color:#00F0FF}.adm-stat b.y{color:#FFC857}.adm-stat b.g{color:#00FF88}
+            .adm-stat span{font-size:12px;letter-spacing:2px;color:#A9B4BC;text-transform:uppercase}
+            .adm-day{font-size:12px;letter-spacing:3px;color:#00F0FF;text-transform:uppercase;margin:6px 0 -4px}
+            .acc-date.adm-time{flex-basis:88px}
+            .acc-date.adm-time b{font-size:24px}
+            .adm-who{background:none;border:0;padding:0;color:#00F0FF;font:inherit;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:rgba(0,240,255,.35);text-underline-offset:3px}
+            .adm-who:hover{text-decoration-color:#00F0FF}
+            .adm-phone{color:#fff;text-decoration:none;white-space:nowrap}
+            .adm-comment{font-style:italic;color:#ccc!important}
+            .adm-acts{display:flex;gap:8px;flex-wrap:wrap;flex:1 1 100%;padding-top:12px;border-top:1px solid #1B2A30}
+            .adm-btn{min-height:40px;padding:0 14px;background:none;border:1px solid #2A3A42;color:#ddd;font:600 13px 'Noto Sans',sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+            .adm-btn:hover{border-color:#00F0FF;color:#00F0FF}
+            .adm-btn.ok{border-color:#00FF88;color:#00FF88}
+            .adm-btn.no{border-color:#5a2a3a;color:#FF6A9A}
+            .adm-btn.no:hover{border-color:#FF6A9A}
+            .adm-btn:disabled{opacity:.5;cursor:default}
+            .adm-form{flex:1 1 100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;background:#070A0D;border:1px solid #2A3A42}
+            .adm-form input,.adm-form select{min-height:44px;box-sizing:border-box;padding:0 10px;background:#0B1216;border:1px solid #2A3A42;color:#fff;font:16px 'Noto Sans',sans-serif;color-scheme:dark}
+            .adm-form input[type=text]{flex:1 1 220px;min-width:0}
+            .adm-form .acc-msg{flex:1 1 100%;margin:0;text-align:left}
+            .adm-form .acc-msg:empty{display:none}
+            .adm-sugg{display:flex;gap:6px;flex-wrap:wrap;flex:1 1 100%}
+            .acc-booking.sel{border-color:#00F0FF}
+            .adm-src{display:inline-block;font-size:11px;padding:2px 8px;border:1px solid currentColor;white-space:nowrap}
+            .adm-src.tg{color:#29B6F6}.adm-src.google{color:#FFC857}.adm-src.no{color:#6b767d}
+            .adm-kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+            .adm-kv div{background:#070A0D;border:1px solid #1B2A30;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+            .adm-kv b{font-size:20px;color:#fff;overflow-wrap:anywhere}
+            .adm-kv span{font-size:11px;letter-spacing:1.5px;color:#A9B4BC;text-transform:uppercase}
+            .adm-hist{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#ccc}
+            .adm-hist div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed #1B2A30;padding-bottom:6px}
+            .adm-hist em{font-style:normal;color:#00F0FF;white-space:nowrap}
+            .adm-note{width:100%;min-height:80px;box-sizing:border-box;padding:10px 12px;background:#070A0D;border:1px solid #2A3A42;color:#ddd;font:15px 'Noto Sans',sans-serif;resize:vertical}
+            .adm-note:focus{border-color:#00F0FF;outline:none}
+            .adm-row{display:flex;gap:8px;flex-wrap:wrap}
+            .adm-row>*{flex:1 1 auto;justify-content:center}
+            .adm-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+            .adm-filters input{flex:1 1 240px;min-width:0;min-height:44px;box-sizing:border-box;padding:0 12px;background:#070A0D;border:1px solid #2A3A42;color:#fff;font:16px 'Noto Sans',sans-serif}
+            .adm-filters input:focus{border-color:#00F0FF;outline:none}
+            .adm-pill{min-height:40px;padding:0 14px;border:1px solid #2A3A42;background:none;color:#A9B4BC;font:600 13px 'Noto Sans',sans-serif;cursor:pointer}
+            .adm-pill[aria-pressed="true"]{border-color:#00F0FF;color:#00F0FF}
+            .adm-scroll{overflow-x:auto}
+            .adm-table{width:100%;border-collapse:collapse;font-size:14px;background:#0B1216;border:1px solid #1B2A30}
+            .adm-table th{text-align:left;font-size:11px;letter-spacing:2px;color:#A9B4BC;text-transform:uppercase;font-weight:600;padding:12px 14px;border-bottom:1px solid #1B2A30;white-space:nowrap}
+            .adm-table td{padding:12px 14px;border-bottom:1px solid #131E23;color:#ddd;white-space:nowrap}
+            .adm-table td:first-child{color:#fff;font-weight:600}
+            .adm-table tbody tr{cursor:pointer}
+            .adm-table tbody tr:hover td,.adm-table tr.sel td{background:rgba(0,240,255,.06)}
+            .adm-cards{display:none;flex-direction:column;gap:10px}
+            .adm-c{width:100%;background:#0B1216;border:1px solid #1B2A30;padding:14px 16px;display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;color:inherit;font:inherit;cursor:pointer}
+            .adm-c.sel{border-color:#00F0FF}
+            .adm-c strong{display:block;color:#fff;font-size:15px}
+            .adm-c span{font-size:13px;color:#A9B4BC}
+            .adm-c i{font-style:normal;text-align:right;font-size:13px;color:#00F0FF;white-space:nowrap}
+            .adm-more{align-self:center}
+            @media (max-width:600px){
+                .adm-stats{grid-template-columns:1fr 1fr;gap:10px}
+                .adm-stat{padding:14px}
+                .adm-stat b{font-size:26px}
+                .adm-stat span{font-size:11px;letter-spacing:1.5px}
+                .adm-scroll{display:none}
+                .adm-cards{display:flex}
+            }
         </style>
     </head>
     <body>
@@ -206,6 +278,51 @@
                 </aside>
             </div>
         </div>
+
+        <!-- Адмін: панель з бронюваннями і клієнтами -->
+        <div class="acc-cab" id="acc-admin" hidden>
+            <div class="acc-hero adm">
+                <div class="adm-top">
+                    <div class="acc-hero-main">
+                        <span class="acc-label">Адмін-панель</span>
+                        <h2 class="acc-name" id="adm-hello"></h2>
+                        <span class="acc-sub">Ви увійшли як адміністратор клубу</span>
+                    </div>
+                    <a class="adm-switch" href="account.html?view=client">Мій кабінет клієнта →</a>
+                </div>
+                <div class="adm-stats">
+                    <div class="adm-stat"><b class="c" id="adm-s-today">–</b><span>бронювань сьогодні</span></div>
+                    <div class="adm-stat"><b class="y" id="adm-s-pending">–</b><span>чекають підтвердження</span></div>
+                    <div class="adm-stat"><b id="adm-s-clients">–</b><span>клієнтів усього</span></div>
+                    <div class="adm-stat"><b class="g" id="adm-s-month">–</b><span id="adm-s-month-l">грн за місяць</span></div>
+                </div>
+            </div>
+
+            <div class="acc-cols">
+                <div class="acc-main">
+                    <div class="acc-tabs" role="tablist" aria-label="Адмін-панель">
+                        <button type="button" class="acc-tab" role="tab" id="adm-tab-b" aria-controls="adm-bookings" aria-selected="true">Бронювання</button>
+                        <button type="button" class="acc-tab" role="tab" id="adm-tab-c" aria-controls="adm-clients" aria-selected="false">Клієнти</button>
+                    </div>
+                    <div class="acc-list" id="adm-bookings" role="tabpanel" aria-labelledby="adm-tab-b"></div>
+                    <div class="acc-list" id="adm-clients" role="tabpanel" aria-labelledby="adm-tab-c" hidden>
+                        <div class="adm-filters">
+                            <input type="search" id="adm-search" placeholder="Пошук: ім'я або телефон" aria-label="Пошук клієнта">
+                        </div>
+                        <div class="adm-filters" id="adm-pills"></div>
+                        <div id="adm-clients-list" class="acc-list"></div>
+                    </div>
+                </div>
+
+                <aside class="acc-side">
+                    <section class="acc-box" id="adm-client" aria-live="polite">
+                        <h2>Клієнт</h2>
+                        <p>Натисніть на ім'я в бронюванні або на клієнта в списку, щоб побачити його історію і нотатку.</p>
+                    </section>
+                    <button type="button" class="acc-logout" id="adm-logout">Вийти з акаунта</button>
+                </aside>
+            </div>
+        </div>
     </section>
         
         
@@ -322,7 +439,8 @@
                 show('acc-loading', name === 'loading');
                 show('acc-login', name === 'login');
                 show('acc-cabinet', name === 'cabinet');
-                show('acc-page-title', name !== 'cabinet'); // у кабінеті заголовок уже є в блоці профілю
+                show('acc-admin', name === 'admin');
+                show('acc-page-title', name !== 'cabinet' && name !== 'admin'); // у кабінеті заголовок уже є в блоці профілю
             }
             function setMsg(id, text, ok) {
                 $(id).textContent = text || '';
@@ -375,7 +493,7 @@
                     if (st === 'ok') {
                         stopWaiting();
                         LevelAuth.setToken(r.data.token);
-                        showCabinet(r.data.user);
+                        showUser(r.data.user);
                     } else if (st === 'denied') {
                         stopWaiting();
                         setMsg('acc-login-msg', 'Вхід скасовано в Telegram.');
@@ -443,7 +561,7 @@
                     if (r.status === 200 && r.data.success) {
                         stopWaiting();
                         LevelAuth.setToken(r.data.token);
-                        showCabinet(r.data.user);
+                        showUser(r.data.user);
                     } else {
                         setMsg('acc-login-msg', r.data.message || 'Не вдалося увійти через Google.');
                     }
@@ -545,6 +663,16 @@
             function showCabinet(user) {
                 screen('cabinet');
                 fillHero(user);
+                // адмін, який відкрив свій кабінет клієнта, має швидко повернутись у панель
+                let back = $('acc-to-admin');
+                if (user.isAdmin && !back) {
+                    back = el('a', 'adm-switch', '← Адмін-панель');
+                    back.id = 'acc-to-admin';
+                    back.href = 'account.html';
+                    back.style.alignSelf = 'flex-start';
+                    back.style.marginTop = '8px';
+                    $('acc-who').after(back);
+                }
                 $('acc-name').value = user.name || '';
                 $('acc-phone').value = user.phone || '';
                 $('acc-count').textContent = '0';
@@ -586,11 +714,401 @@
 
             $('acc-reload').addEventListener('click', () => location.reload());
 
+
+            /* ================= АДМІН-ПАНЕЛЬ ================= */
+            const adm = { today: '', bookings: [], clients: null, filter: 'all', tail: '', user: null };
+            const money = (n) => (Number(n) || 0).toLocaleString('uk-UA').replace(/ /g, ' ');
+            const ddmm = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? `${p[2]}.${p[1]}` : ''; };
+            const MONTHS_FULL = ['січень', 'лютий', 'березень', 'квітень', 'травень', 'червень', 'липень', 'серпень', 'вересень', 'жовтень', 'листопад', 'грудень'];
+            const srcChip = (src) => el('span', 'adm-src ' + (src || 'no'), src === 'tg' ? 'Telegram' : src === 'google' ? 'Google' : 'без акаунта');
+            const telHref = (phone) => 'tel:' + String(phone || '').replace(/[^\d+]/g, '');
+            function dayTitle(date) {
+                const p = String(date).split('-').map(Number);
+                const d = new Date(p[0], p[1] - 1, p[2]);
+                const t = String(adm.today).split('-').map(Number);
+                const diff = Math.round((d - new Date(t[0], t[1] - 1, t[2])) / 86400000);
+                const name = diff === 0 ? 'Сьогодні' : diff === 1 ? 'Завтра' : DAYS[d.getDay()];
+                return `${name.charAt(0).toUpperCase() + name.slice(1)} · ${diff <= 1 ? DAYS[d.getDay()] + ' ' : ''}${ddmm(date)}`;
+            }
+            function authFail(r) {
+                if (r.status === 401) { LevelAuth.setToken(''); showLogin('Сесія закінчилась. Увійдіть ще раз.'); return true; }
+                if (r.status === 403 && r.data.code === 'NOT_ADMIN') { location.href = 'account.html?view=client'; return true; }
+                return false;
+            }
+            function timeOptions(select, current) {
+                select.textContent = '';
+                for (let m = 10 * 60; m < 22 * 60; m += 30) {
+                    const o = el('option', '', hhmm(m));
+                    o.value = hhmm(m);
+                    select.appendChild(o);
+                }
+                if (current && ![...select.options].some((o) => o.value === current)) {
+                    const o = el('option', '', current); o.value = current; select.insertBefore(o, select.firstChild);
+                }
+                select.value = current || '10:00';
+            }
+            async function act(path, body, msgEl, btn) {
+                if (btn) btn.disabled = true;
+                setMsgEl(msgEl, 'Зачекайте...');
+                try {
+                    const r = await api(path, { method: 'POST', body });
+                    if (authFail(r)) return null;
+                    if (!r.data.success) { setMsgEl(msgEl, r.data.message || 'Не вдалося.'); return r; }
+                    return r;
+                } catch (e) {
+                    setMsgEl(msgEl, NO_NET);
+                    return null;
+                } finally {
+                    if (btn) btn.disabled = false;
+                }
+            }
+            function setMsgEl(n, text, ok) { if (!n) return; n.textContent = text || ''; n.classList.toggle('ok', !!ok); }
+            const doneNote = (r, what) => what + (r.data.clientNotified ? ' Клієнту надіслано повідомлення в Telegram.' : ' Клієнт не підключений до бота: повідомте його вручну.');
+
+            function admBookingCard(b) {
+                const row = el('article', 'acc-booking' + (b.tail && b.tail === adm.tail ? ' sel' : ''));
+                row.dataset.tail = b.tail;
+                const items = b.items || [];
+                const longest = Math.max(1, ...items.map((i) => Number(i.duration) || 0));
+                const box = el('div', 'acc-date adm-time');
+                box.appendChild(el('b', '', b.time));
+                box.appendChild(el('span', '', `${longest} год`));
+                row.appendChild(box);
+
+                const info = el('div', 'acc-info');
+                const head = el('strong');
+                const who = el('button', 'adm-who', b.name || 'Без імені');
+                who.type = 'button';
+                who.addEventListener('click', () => openClient(b.tail));
+                head.appendChild(who);
+                head.appendChild(document.createTextNode(' · '));
+                const ph = el('a', 'adm-phone', b.phone);
+                ph.href = telHref(b.phone);
+                head.appendChild(ph);
+                info.appendChild(head);
+                info.appendChild(el('span', '', items.map((i) => `${i.device} · ${i.duration} год`).join(' + ') || 'Бронювання'));
+                if (b.comment) info.appendChild(el('span', 'adm-comment', '💬 ' + b.comment));
+                info.appendChild(el('span', 'acc-price', `#${b.id} · ${money(b.total)} грн`));
+                row.appendChild(info);
+                row.appendChild(el('span', 'acc-chip ' + (b.confirmed ? 'ok' : 'wait'), b.confirmed ? 'Підтверджено' : 'Очікує'));
+
+                const acts = el('div', 'adm-acts');
+                const form = el('div', 'adm-form');
+                form.hidden = true;
+                const msg = el('p', 'acc-msg');
+                msg.setAttribute('role', 'status');
+                const btn = (text, cls, fn) => { const x = el('button', 'adm-btn' + (cls ? ' ' + cls : ''), text); x.type = 'button'; x.addEventListener('click', fn); acts.appendChild(x); return x; };
+
+                if (!b.confirmed) {
+                    const ok = btn('✓ Підтвердити', 'ok', async () => {
+                        form.hidden = false; form.textContent = ''; form.appendChild(msg);
+                        const r = await act('/api/admin/booking/confirm', { id: b.id }, msg, ok);
+                        if (r && r.data.success) { setMsgEl(msg, doneNote(r, 'Підтверджено.'), true); setTimeout(loadAdmin, 1600); }
+                    });
+                }
+                btn('Перенести', '', () => {
+                    form.hidden = false; form.textContent = '';
+                    const d = el('input'); d.type = 'date'; d.value = b.date; d.min = adm.today; d.setAttribute('aria-label', 'Нова дата');
+                    const t = el('select'); t.setAttribute('aria-label', 'Новий час'); timeOptions(t, b.time);
+                    const go = el('button', 'adm-btn ok', 'Перенести'); go.type = 'button';
+                    const close = el('button', 'adm-btn', 'Закрити'); close.type = 'button';
+                    const sugg = el('div', 'adm-sugg');
+                    close.addEventListener('click', () => { form.hidden = true; });
+                    const send = async (force) => {
+                        sugg.textContent = '';
+                        const r = await act('/api/admin/booking/move', { id: b.id, date: d.value, time: t.value, force: !!force }, msg, go);
+                        if (!r) return;
+                        if (r.data.success) { setMsgEl(msg, doneNote(r, 'Перенесено.'), true); setTimeout(loadAdmin, 1600); return; }
+                        if (r.data.code === 'UNAVAILABLE') {
+                            (r.data.suggestions || []).slice(0, 4).forEach((sg) => {
+                                const x = el('button', 'adm-btn', sg); x.type = 'button';
+                                x.addEventListener('click', () => { timeOptions(t, sg); send(false); });
+                                sugg.appendChild(x);
+                            });
+                            const f = el('button', 'adm-btn no', 'Перенести все одно'); f.type = 'button';
+                            f.addEventListener('click', () => send(true));
+                            sugg.appendChild(f);
+                        }
+                    };
+                    go.addEventListener('click', () => send(false));
+                    [d, t, go, close, msg, sugg].forEach((n) => form.appendChild(n));
+                    setMsgEl(msg, '');
+                });
+                btn('Скасувати', 'no', () => {
+                    form.hidden = false; form.textContent = '';
+                    const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.placeholder = 'Причина (її отримає клієнт)'; reason.setAttribute('aria-label', 'Причина скасування');
+                    const go = el('button', 'adm-btn no', 'Скасувати бронювання'); go.type = 'button';
+                    const close = el('button', 'adm-btn', 'Ні'); close.type = 'button';
+                    close.addEventListener('click', () => { form.hidden = true; });
+                    go.addEventListener('click', async () => {
+                        if (reason.value.trim().length < 2) { setMsgEl(msg, 'Вкажіть причину скасування.'); reason.focus(); return; }
+                        const r = await act('/api/admin/booking/cancel', { id: b.id, reason: reason.value }, msg, go);
+                        if (r && r.data.success) { setMsgEl(msg, doneNote(r, 'Скасовано.'), true); setTimeout(loadAdmin, 1600); }
+                    });
+                    [reason, go, close, msg].forEach((n) => form.appendChild(n));
+                    setMsgEl(msg, '');
+                    reason.focus();
+                });
+                if (b.username) {
+                    const tg = el('a', 'adm-btn', 'Telegram'); tg.href = 'https://t.me/' + encodeURIComponent(b.username); tg.target = '_blank'; tg.rel = 'noopener';
+                    acts.appendChild(tg);
+                } else {
+                    const call = el('a', 'adm-btn', 'Подзвонити'); call.href = telHref(b.phone);
+                    acts.appendChild(call);
+                }
+                row.appendChild(acts);
+                row.appendChild(form);
+                return row;
+            }
+
+            function renderBookings() {
+                const box = $('adm-bookings');
+                box.textContent = '';
+                if (!adm.bookings.length) { box.appendChild(el('p', 'acc-empty', 'Майбутніх бронювань поки немає.')); return; }
+                let day = '';
+                adm.bookings.forEach((b) => {
+                    if (b.date !== day) { day = b.date; box.appendChild(el('div', 'adm-day', dayTitle(day))); }
+                    box.appendChild(admBookingCard(b));
+                });
+            }
+
+            async function loadAdmin() {
+                const box = $('adm-bookings');
+                if (!adm.bookings.length) { box.textContent = ''; box.appendChild(el('p', 'acc-empty', 'Завантаження...')); }
+                try {
+                    const r = await api('/api/admin/overview');
+                    if (authFail(r)) return;
+                    if (!r.data.success) throw new Error('server');
+                    adm.today = r.data.today;
+                    adm.bookings = r.data.bookings;
+                    const st = r.data.stats;
+                    $('adm-s-today').textContent = String(st.today);
+                    $('adm-s-pending').textContent = String(st.pending);
+                    $('adm-s-clients').textContent = String(st.clients);
+                    $('adm-s-month').textContent = money(st.monthSum);
+                    $('adm-s-month-l').textContent = 'грн за ' + (MONTHS_FULL[Number(String(st.month).slice(5, 7)) - 1] || 'місяць');
+                    renderBookings();
+                    if (adm.clients) loadClients(); // список клієнтів теж міг змінитись
+                    if (adm.tail) openClient(adm.tail, true);
+                } catch (e) {
+                    box.textContent = '';
+                    box.appendChild(el('p', 'acc-empty', 'Не вдалося завантажити бронювання. Оновіть сторінку.'));
+                }
+            }
+
+            /* --- клієнти --- */
+            const FILTERS = [
+                ['all', 'Усі', () => true],
+                ['acc', 'З акаунтом', (c) => !!c.source],
+                ['reg', 'Постійні (3+)', (c) => c.visits >= 3],
+                ['gone', 'Давно не були', (c) => {
+                    if (!c.last || c.upcoming) return false;
+                    const p = c.last.split('-').map(Number), t = adm.today.split('-').map(Number);
+                    return (new Date(t[0], t[1] - 1, t[2]) - new Date(p[0], p[1] - 1, p[2])) / 86400000 > 60;
+                }]
+            ];
+            function renderClients() {
+                const list = $('adm-clients-list');
+                const pills = $('adm-pills');
+                list.textContent = '';
+                pills.textContent = '';
+                if (!adm.clients) { list.appendChild(el('p', 'acc-empty', 'Завантаження...')); return; }
+                FILTERS.forEach(([key, label, fn]) => {
+                    const b = el('button', 'adm-pill', `${label} · ${adm.clients.filter(fn).length}`);
+                    b.type = 'button';
+                    b.setAttribute('aria-pressed', String(adm.filter === key));
+                    b.addEventListener('click', () => { adm.filter = key; renderClients(); });
+                    pills.appendChild(b);
+                });
+                const q = $('adm-search').value.trim().toLowerCase();
+                const qDigits = q.replace(/\D/g, '');
+                const fn = (FILTERS.find((f) => f[0] === adm.filter) || FILTERS[0])[2];
+                const shown = adm.clients.filter((c) => fn(c) && (!q ||
+                    c.name.toLowerCase().includes(q) || (qDigits.length >= 3 && c.phone.replace(/\D/g, '').includes(qDigits)) ||
+                    (c.username && c.username.toLowerCase().includes(q.replace(/^@/, '')))));
+                if (!shown.length) { list.appendChild(el('p', 'acc-empty', adm.clients.length ? 'Нікого не знайдено.' : 'Клієнтів поки немає.')); return; }
+
+                const LIMIT = 200;
+                const part = shown.slice(0, LIMIT);
+                const wrap = el('div', 'adm-scroll');
+                const table = el('table', 'adm-table');
+                const thead = el('thead');
+                const hr = el('tr');
+                ['Клієнт', 'Телефон', 'Вхід', 'Візитів', 'Витрачено', 'Останній візит'].forEach((h) => hr.appendChild(el('th', '', h)));
+                thead.appendChild(hr);
+                table.appendChild(thead);
+                const tbody = el('tbody');
+                const cards = el('div', 'adm-cards');
+                part.forEach((c) => {
+                    const tr = el('tr', c.tail === adm.tail ? 'sel' : '');
+                    tr.tabIndex = 0;
+                    tr.appendChild(el('td', '', c.name || 'Без імені'));
+                    tr.appendChild(el('td', '', c.phone));
+                    const src = el('td'); src.appendChild(srcChip(c.source)); tr.appendChild(src);
+                    tr.appendChild(el('td', '', String(c.visits) + (c.upcoming ? ` (+${c.upcoming})` : '')));
+                    tr.appendChild(el('td', '', `${money(c.spent)} грн`));
+                    tr.appendChild(el('td', '', c.last ? ddmm(c.last) + '.' + c.last.slice(0, 4) : '—'));
+                    tr.addEventListener('click', () => openClient(c.tail));
+                    tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openClient(c.tail); });
+                    tbody.appendChild(tr);
+
+                    const card = el('button', 'adm-c' + (c.tail === adm.tail ? ' sel' : ''));
+                    card.type = 'button';
+                    const left = el('div');
+                    left.appendChild(el('strong', '', c.name || 'Без імені'));
+                    left.appendChild(el('span', '', c.phone));
+                    const right = el('i', '', `${c.visits} віз. · ${money(c.spent)} грн`);
+                    card.appendChild(left);
+                    card.appendChild(right);
+                    card.addEventListener('click', () => openClient(c.tail));
+                    cards.appendChild(card);
+                });
+                table.appendChild(tbody);
+                wrap.appendChild(table);
+                list.appendChild(wrap);
+                list.appendChild(cards);
+                if (shown.length > LIMIT) list.appendChild(el('p', 'acc-hint', `Показано ${LIMIT} з ${shown.length}. Уточніть пошук.`));
+            }
+            async function loadClients() {
+                if (!adm.clients) renderClients();
+                try {
+                    const r = await api('/api/admin/clients');
+                    if (authFail(r)) return;
+                    if (!r.data.success) throw new Error('server');
+                    adm.today = r.data.today;
+                    adm.clients = r.data.clients;
+                    renderClients();
+                } catch (e) {
+                    const list = $('adm-clients-list');
+                    list.textContent = '';
+                    list.appendChild(el('p', 'acc-empty', 'Не вдалося завантажити клієнтів. Оновіть сторінку.'));
+                }
+            }
+            $('adm-search').addEventListener('input', renderClients);
+
+            async function openClient(tail, quiet) {
+                if (!/^\d{9}$/.test(String(tail || ''))) return;
+                adm.tail = tail;
+                document.querySelectorAll('#adm-bookings .acc-booking').forEach((n) => n.classList.toggle('sel', n.dataset.tail === tail));
+                if (adm.clients) renderClients();
+                const box = $('adm-client');
+                if (!quiet) {
+                    box.textContent = '';
+                    box.appendChild(el('h2', '', 'Завантаження...'));
+                    if (window.innerWidth <= 900) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                try {
+                    const r = await api('/api/admin/client?tail=' + encodeURIComponent(tail));
+                    if (authFail(r)) return;
+                    if (!r.data.success) throw new Error('server');
+                    if (adm.tail !== tail) return; // поки вантажилось, обрали іншого
+                    const list = r.data.bookings;
+                    const last = list[0] || {};
+                    const past = list.filter((b) => b.date <= adm.today);
+                    const src = (list.find((b) => b.source) || {}).source || '';
+                    const username = (list.find((b) => b.username) || {}).username || '';
+                    box.textContent = '';
+                    box.appendChild(el('h2', '', last.name || 'Клієнт'));
+                    const line = el('p');
+                    const ph = el('a', 'adm-phone', last.phone || '');
+                    ph.href = telHref(last.phone);
+                    line.appendChild(ph);
+                    line.appendChild(document.createTextNode(' · '));
+                    line.appendChild(srcChip(src));
+                    if (username) line.appendChild(document.createTextNode(' @' + username));
+                    box.appendChild(line);
+
+                    const kv = el('div', 'adm-kv');
+                    const cell = (v, l) => { const d = el('div'); d.appendChild(el('b', '', v)); d.appendChild(el('span', '', l)); kv.appendChild(d); };
+                    cell(String(past.length), 'візитів');
+                    cell(`${money(past.reduce((s, b) => s + b.total, 0))} грн`, 'витрачено');
+                    cell(list.length ? ddmm(list[list.length - 1].date) + '.' + list[list.length - 1].date.slice(0, 4) : '—', 'перший візит');
+                    cell(past.length ? ddmm(past[0].date) : '—', 'останній');
+                    box.appendChild(kv);
+
+                    box.appendChild(el('label', '', 'Історія'));
+                    const hist = el('div', 'adm-hist');
+                    list.slice(0, 12).forEach((b) => {
+                        const d = el('div');
+                        d.appendChild(el('span', '', `${ddmm(b.date)} ${b.time} · ${(b.items || []).map((i) => `${i.device}, ${i.duration} год`).join(' + ')}${b.date > adm.today || (b.date === adm.today && !past.includes(b)) ? ' (заплановано)' : ''}`));
+                        d.appendChild(el('em', '', `${money(b.total)} грн`));
+                        hist.appendChild(d);
+                    });
+                    if (!list.length) hist.appendChild(el('span', '', 'Бронювань немає.'));
+                    box.appendChild(hist);
+
+                    const nl = el('label', '', 'Нотатка (бачать тільки адміни)');
+                    nl.htmlFor = 'adm-note';
+                    box.appendChild(nl);
+                    const note = el('textarea', 'adm-note');
+                    note.id = 'adm-note';
+                    note.maxLength = 1000;
+                    note.value = r.data.note || '';
+                    note.placeholder = 'Наприклад: постійний клієнт, любить VR';
+                    box.appendChild(note);
+                    const save = el('button', 'acc-save', 'Зберегти нотатку');
+                    save.type = 'button';
+                    const msg = el('p', 'acc-msg');
+                    msg.setAttribute('role', 'status');
+                    save.addEventListener('click', async () => {
+                        const res = await act('/api/admin/client/note', { tail, note: note.value }, msg, save);
+                        if (res && res.data.success) {
+                            setMsgEl(msg, 'Збережено.', true);
+                            const c = adm.clients && adm.clients.find((x) => x.tail === tail);
+                            if (c) c.note = res.data.note;
+                        }
+                    });
+                    box.appendChild(save);
+                    box.appendChild(msg);
+
+                    const row = el('div', 'adm-row');
+                    if (username) {
+                        const tg = el('a', 'adm-btn', 'Написати в Telegram');
+                        tg.href = 'https://t.me/' + encodeURIComponent(username); tg.target = '_blank'; tg.rel = 'noopener';
+                        row.appendChild(tg);
+                    }
+                    const call = el('a', 'adm-btn', 'Подзвонити');
+                    call.href = telHref(last.phone);
+                    row.appendChild(call);
+                    box.appendChild(row);
+                } catch (e) {
+                    if (!quiet) { box.textContent = ''; box.appendChild(el('h2', '', 'Клієнт')); box.appendChild(el('p', '', 'Не вдалося завантажити. Спробуйте ще раз.')); }
+                }
+            }
+
+            function selectAdmTab(which) {
+                const c = which === 'c';
+                $('adm-tab-b').setAttribute('aria-selected', String(!c));
+                $('adm-tab-c').setAttribute('aria-selected', String(c));
+                show('adm-bookings', !c);
+                show('adm-clients', c);
+                if (c && !adm.clients) loadClients();
+            }
+            $('adm-tab-b').addEventListener('click', () => selectAdmTab('b'));
+            $('adm-tab-c').addEventListener('click', () => selectAdmTab('c'));
+
+            function showAdmin(user) {
+                adm.user = user;
+                screen('admin');
+                document.title = 'Адмін-панель | Level VR Club';
+                $('adm-hello').textContent = 'Вітаю, ' + (user.name || 'адмін');
+                selectAdmTab('b');
+                loadAdmin();
+            }
+            // Нові бронювання з'являються самі, поки панель відкрита
+            setInterval(() => { if (!$('acc-admin').hidden && !document.hidden && !document.querySelector('#acc-admin .adm-form:not([hidden])')) loadAdmin(); }, 60000);
+            $('adm-logout').addEventListener('click', () => $('acc-logout').click());
+
+            const wantsClientView = new URLSearchParams(location.search).get('view') === 'client';
+            function showUser(user) {
+                if (user && user.isAdmin && !wantsClientView) return showAdmin(user);
+                showCabinet(user);
+            }
             /* ================= СТАРТ ================= */
             (async function start() {
                 screen('loading');
                 const user = await LevelAuth.me();
-                if (user) return showCabinet(user);
+                if (user) return showUser(user);
                 if (LevelAuth.getToken()) {
                     // токен є, але сервер не відповів: не розлогінюємо, просимо оновити
                     $('acc-loading-text').textContent = NO_NET;

@@ -142,6 +142,14 @@ const pool = new Pool({
   await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS user_id INTEGER`);
   await client.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS confirmed BOOLEAN DEFAULT FALSE`);
   await client.query(`CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings (user_id)`);
+  // Нотатки адміна про клієнта (клієнт = останні 9 цифр телефону)
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS client_notes (
+      phone_tail TEXT PRIMARY KEY,
+      note TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
   // НОВА ТАБЛИЦЯ ДЛЯ ІГОР
   await client.query(`
@@ -799,8 +807,22 @@ const publicUser = (u) => ({
   email: u.email || '',
   username: u.username || '',
   hasTelegram: !!u.telegram_id,
-  hasGoogle: !!u.google_sub
+  hasGoogle: !!u.google_sub,
+  isAdmin: isSiteAdmin(u)
 });
+
+// Хто бачить адмін-панель на сайті: власник (OWNER_CHAT_ID — особистий Telegram) і,
+// за бажанням, інші люди зі списків SITE_ADMIN_TELEGRAM_IDS / SITE_ADMIN_EMAILS (через кому).
+// ADMIN_CHAT_ID — це група, тому вона сюди не входить.
+const listEnv = (v) => String(v || '').split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+const SITE_ADMIN_TG = new Set([OWNER_CHAT_ID, ...listEnv(process.env.SITE_ADMIN_TELEGRAM_IDS)]
+  .map((x) => String(x || '').trim()).filter((x) => /^\d+$/.test(x)));
+const SITE_ADMIN_EMAILS = new Set(listEnv(process.env.SITE_ADMIN_EMAILS).map((x) => x.toLowerCase()));
+function isSiteAdmin(u) {
+  if (!u) return false;
+  if (u.telegram_id && SITE_ADMIN_TG.has(String(u.telegram_id))) return true;
+  return !!(u.google_sub && u.email && SITE_ADMIN_EMAILS.has(String(u.email).toLowerCase()));
+}
 
 // Сесія: випадковий токен у клієнта, у базі лише його хеш
 async function createSession(userId) {
@@ -1060,7 +1082,7 @@ app.post('/api/auth/google', authLoginLimit, async (req, res) => {
        ON CONFLICT (google_sub) DO UPDATE
          SET email = EXCLUDED.email, name = COALESCE(NULLIF(users.name, ''), EXCLUDED.name)
        RETURNING *`,
-      [payload.sub, String(payload.email || '').slice(0, 200), String(payload.name || payload.given_name || '').slice(0, 60)]
+      [payload.sub, (payload.email_verified === true || payload.email_verified === 'true') ? String(payload.email || '').slice(0, 200) : '', String(payload.name || payload.given_name || '').slice(0, 60)]
     );
     const token = await createSession(u.rows[0].id);
     res.set('Cache-Control', 'no-store');
@@ -2019,6 +2041,263 @@ app.post('/api/games/delete-site', async (req, res) => {
 
 /* ================= ERRORS ================= */
 // Завжди JSON і без технічних подробиць для відвідувача
+
+/* ================= АДМІН-ПАНЕЛЬ НА САЙТІ ================= */
+async function requireSiteAdmin(req, res) {
+  const account = await requireAccount(req, res);
+  if (!account) return null;
+  if (!isSiteAdmin(account.user)) {
+    res.status(403).json({ success: false, code: 'NOT_ADMIN', message: 'Немає доступу.' });
+    return null;
+  }
+  res.set('Cache-Control', 'no-store');
+  return account;
+}
+
+const parseCart = (cart) => {
+  if (typeof cart === 'string') { try { cart = JSON.parse(cart); } catch { cart = []; } }
+  return (Array.isArray(cart) ? cart : []).map((i) => ({
+    device: String(i.device || ''), duration: Number(i.duration) || 0, price: Number(i.price) || 0,
+    persons: Number(i.persons) || undefined
+  }));
+};
+const phoneTail = (phone) => String(phone || '').replace(/\D/g, '').slice(-9);
+const adminWho = (account) => account.user.name || (account.user.username ? '@' + account.user.username : 'адмін');
+
+// Тихо повідомляємо групу адмінів, щоб там бачили дії, зроблені на сайті
+const tellGroup = (text) => (ADMIN_CHAT_ID
+  ? bot.sendMessage(ADMIN_CHAT_ID, text).catch((e) => console.error('Не вдалося написати в групу:', e.message))
+  : Promise.resolve());
+const tellClient = async (chatId, text) => {
+  if (!chatId) return false;
+  try { await bot.sendMessage(chatId, text); return true; } catch (e) { return false; }
+};
+
+function adminBooking(b) {
+  return {
+    id: b.id, name: b.name || '', phone: b.phone || '', tail: phoneTail(b.phone),
+    date: b.booking_date, time: b.booking_time, total: Number(b.total_price) || 0,
+    confirmed: !!b.confirmed, comment: b.comment && b.comment !== 'Немає' ? b.comment : '',
+    items: parseCart(b.cart_details), botLinked: !!b.client_chat_id,
+    username: b.username || '', source: b.telegram_id ? 'tg' : (b.google_sub ? 'google' : '')
+  };
+}
+
+app.get('/api/admin/overview', async (req, res) => {
+  try {
+    if (!(await requireSiteAdmin(req, res))) return;
+    const today = kyivToday().date;
+    const month = today.slice(0, 7);
+    const [list, stats] = await Promise.all([
+      pool.query(
+        `SELECT b.*, u.username, u.telegram_id, u.google_sub
+           FROM bookings b LEFT JOIN users u ON u.id = b.user_id
+          WHERE b.booking_date >= $1
+          ORDER BY b.booking_date, b.booking_time, b.id LIMIT 300`, [today]),
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE booking_date = $1)::int AS today,
+           COUNT(*) FILTER (WHERE booking_date >= $1 AND NOT COALESCE(confirmed, FALSE))::int AS pending,
+           COALESCE(SUM(total_price) FILTER (WHERE booking_date LIKE $2 || '-%'), 0)::float AS month_sum,
+           COUNT(DISTINCT ${PHONE_TAIL_SQL})::int AS clients
+         FROM bookings`, [today, month])
+    ]);
+    const st = stats.rows[0];
+    res.json({
+      success: true, today,
+      stats: { today: st.today, pending: st.pending, clients: st.clients, monthSum: Math.round(st.month_sum), month },
+      bookings: list.rows.map(adminBooking)
+    });
+  } catch (e) {
+    console.error('admin/overview:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.get('/api/admin/clients', async (req, res) => {
+  try {
+    if (!(await requireSiteAdmin(req, res))) return;
+    const today = kyivToday().date;
+    const r = await pool.query(
+      `WITH c AS (
+         SELECT ${PHONE_TAIL_SQL} AS tail,
+                (array_agg(name ORDER BY created_at DESC))[1] AS name,
+                (array_agg(phone ORDER BY created_at DESC))[1] AS phone,
+                COUNT(*) FILTER (WHERE booking_date <= $1)::int AS visits,
+                COUNT(*) FILTER (WHERE booking_date > $1)::int AS upcoming,
+                COALESCE(SUM(total_price) FILTER (WHERE booking_date <= $1), 0)::float AS spent,
+                MIN(booking_date) AS first_date,
+                MAX(booking_date) FILTER (WHERE booking_date <= $1) AS last_date,
+                MAX(user_id) AS user_id
+           FROM bookings GROUP BY 1
+       )
+       SELECT c.*, u.username, u.telegram_id, u.google_sub, n.note
+         FROM c LEFT JOIN users u ON u.id = c.user_id
+                LEFT JOIN client_notes n ON n.phone_tail = c.tail
+        WHERE c.tail <> ''
+        ORDER BY c.last_date DESC NULLS LAST, c.first_date DESC LIMIT 3000`, [today]);
+    res.json({
+      success: true, today,
+      clients: r.rows.map((c) => ({
+        tail: c.tail, name: c.name || '', phone: c.phone || '', visits: c.visits, upcoming: c.upcoming,
+        spent: Math.round(c.spent), first: c.first_date, last: c.last_date || '',
+        username: c.username || '', source: c.telegram_id ? 'tg' : (c.google_sub ? 'google' : ''),
+        note: c.note || ''
+      }))
+    });
+  } catch (e) {
+    console.error('admin/clients:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.get('/api/admin/client', async (req, res) => {
+  try {
+    if (!(await requireSiteAdmin(req, res))) return;
+    const tail = String(req.query.tail || '');
+    if (!/^\d{9}$/.test(tail)) return res.status(400).json({ success: false, message: 'Некоректний клієнт.' });
+    const [list, note] = await Promise.all([
+      pool.query(
+        `SELECT b.*, u.username, u.telegram_id, u.google_sub
+           FROM bookings b LEFT JOIN users u ON u.id = b.user_id
+          WHERE ${PHONE_TAIL_SQL.replace('phone', 'b.phone')} = $1
+          ORDER BY b.booking_date DESC, b.booking_time DESC LIMIT 200`, [tail]),
+      pool.query('SELECT note FROM client_notes WHERE phone_tail = $1', [tail])
+    ]);
+    res.json({ success: true, bookings: list.rows.map(adminBooking), note: note.rows[0] ? note.rows[0].note : '' });
+  } catch (e) {
+    console.error('admin/client:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.post('/api/admin/client/note', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    if (!(await requireSiteAdmin(req, res))) return;
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    const tail = String(b.tail || '');
+    if (!/^\d{9}$/.test(tail)) return res.status(400).json({ success: false, message: 'Некоректний клієнт.' });
+    const note = String(b.note ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, 1000);
+    await pool.query(
+      `INSERT INTO client_notes (phone_tail, note, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (phone_tail) DO UPDATE SET note = EXCLUDED.note, updated_at = NOW()`, [tail, note]);
+    res.json({ success: true, note });
+  } catch (e) {
+    console.error('admin/note:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+const bookingIdFrom = (b) => (/^\d{1,9}$/.test(String(b && b.id)) ? Number(b.id) : null);
+
+app.post('/api/admin/booking/confirm', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const account = await requireSiteAdmin(req, res);
+    if (!account) return;
+    const id = bookingIdFrom(req.body);
+    if (!id) return res.status(400).json({ success: false, message: 'Некоректне бронювання.' });
+    const r = await pool.query('UPDATE bookings SET confirmed = TRUE WHERE id = $1 RETURNING *', [id]);
+    const b = r.rows[0];
+    if (!b) return res.status(404).json({ success: false, message: 'Бронювання вже немає (його могли скасувати).' });
+    const told = await tellClient(b.client_chat_id, `✅ Замовлення #${id} підтверджено на ${b.booking_time}!`);
+    tellGroup(`✅ #${id} (${b.name}, ${fmtDate(b.booking_date)} ${b.booking_time}) підтверджено на сайті — ${adminWho(account)}`);
+    res.json({ success: true, clientNotified: told });
+  } catch (e) {
+    console.error('admin/confirm:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.post('/api/admin/booking/cancel', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const account = await requireSiteAdmin(req, res);
+    if (!account) return;
+    const id = bookingIdFrom(req.body);
+    const reason = String((req.body && req.body.reason) ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, 300);
+    if (!id) return res.status(400).json({ success: false, message: 'Некоректне бронювання.' });
+    if (reason.length < 2) return res.status(400).json({ success: false, message: 'Вкажіть причину скасування.' });
+    const r = await pool.query('DELETE FROM bookings WHERE id = $1 RETURNING *', [id]);
+    const b = r.rows[0];
+    if (!b) return res.status(404).json({ success: false, message: 'Бронювання вже скасоване.' });
+    const told = await tellClient(b.client_chat_id, `❌ Замовлення #${id} скасовано\nПричина: ${reason}`);
+    tellGroup(`❌ #${id} (${b.name}, ${b.phone}, ${fmtDate(b.booking_date)} ${b.booking_time}) скасовано на сайті — ${adminWho(account)}\nПричина: ${reason}` +
+      (told ? '' : '\nℹ️ Клієнт не підключений до бота: повідомте його вручну.'));
+    res.json({ success: true, clientNotified: told });
+  } catch (e) {
+    console.error('admin/cancel:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
+app.post('/api/admin/booking/move', async (req, res) => {
+  try {
+    if (!authOrigin(req, res)) return;
+    const account = await requireSiteAdmin(req, res);
+    if (!account) return;
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const id = bookingIdFrom(body);
+    if (!id) return res.status(400).json({ success: false, message: 'Некоректне бронювання.' });
+    const date = String(body.date || '');
+    const time = String(body.time || '');
+    const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+    const tm = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+    if (!dm || !tm) return res.status(400).json({ success: false, message: 'Вкажіть дату й час.' });
+    const [y, mo, d] = [dm[1], dm[2], dm[3]].map(Number);
+    const when = new Date(y, mo - 1, d, Number(tm[1]), Number(tm[2]));
+    if (when.getMonth() !== mo - 1 || when.getDate() !== d) return res.status(400).json({ success: false, message: 'Такої дати не існує.' });
+    if (when < kyivNow()) return res.status(400).json({ success: false, message: 'Цей час уже минув.' });
+
+    const found = await pool.query('SELECT * FROM bookings WHERE id = $1', [id]);
+    const b = found.rows[0];
+    if (!b) return res.status(404).json({ success: false, message: 'Бронювання вже немає.' });
+    if (b.booking_date === date && b.booking_time === time) {
+      return res.status(400).json({ success: false, message: 'Це вже поточні дата й час.' });
+    }
+
+    const cart = parseCart(b.cart_details);
+    const startMin = toMin(time);
+    const longest = Math.max(1, ...cart.map((i) => i.duration));
+    if (startMin < OPEN_MIN || startMin + longest * 60 > CLOSE_MIN) {
+      return res.status(400).json({ success: false, message: `Клуб працює з 10:00 до 22:00. Для ${longest} год найпізніший початок — ${22 - longest}:00.` });
+    }
+
+    const db = await pool.connect();
+    try {
+      await db.query('BEGIN');
+      await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`bookings:${date}`]);
+      if (!body.force) {
+        const day = await db.query('SELECT booking_time, cart_details FROM bookings WHERE booking_date = $1 AND id <> $2', [date, id]);
+        const verdict = evaluateRequest(dayIntervals(day.rows), date, time, cart);
+        if (!verdict.ok) {
+          await db.query('ROLLBACK');
+          return res.status(409).json({ success: false, code: 'UNAVAILABLE', message: verdict.message, suggestions: verdict.suggestions || [] });
+        }
+      }
+      await db.query('UPDATE bookings SET booking_date = $1, booking_time = $2 WHERE id = $3', [date, time, id]);
+      await db.query('COMMIT');
+    } catch (e) {
+      try { await db.query('ROLLBACK'); } catch (_) { /* вже відкочено */ }
+      throw e;
+    } finally {
+      db.release();
+    }
+
+    const oldStr = `${fmtDate(b.booking_date)} ${b.booking_time}`;
+    const newStr = `${fmtDate(date)} ${time}`;
+    const told = await tellClient(b.client_chat_id,
+      `🔄 Ваше замовлення #${id} у LEVEL VR CLUB перенесено.\n\n❌ Було: ${oldStr}\n✅ Тепер: ${newStr}`);
+    tellGroup(`🔄 #${id} (${b.name}, ${b.phone}) перенесено на сайті — ${adminWho(account)}\n${oldStr} → ${newStr}` +
+      (told ? '' : '\nℹ️ Клієнт не підключений до бота: повідомте його вручну.'));
+    res.json({ success: true, clientNotified: told });
+  } catch (e) {
+    console.error('admin/move:', e.message);
+    res.status(500).json({ success: false, message: 'Помилка сервера.' });
+  }
+});
+
 app.use((err, req, res, next) => {
   if (err && err.type === 'entity.too.large') {
     return res.status(413).json({ success: false, message: 'Запит занадто великий.' });
